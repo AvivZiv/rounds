@@ -140,14 +140,17 @@ async function flattenOutline(pdf) {
     const next = entries.slice(i + 1).find((n) => n.depth <= e.depth && n.page > e.page);
     skip.push([e.page, next ? next.page - 1 : Infinity]);
   });
+  const NUMBERED = /^(chapter\s+)?\d{1,4}[.:]?\s+\S/i;
+  const numberedShare = entries.filter((e) => NUMBERED.test(e.title)).length / Math.max(1, entries.length);
+  for (const e of entries) e.chapter = numberedShare >= 0.3 ? NUMBERED.test(e.title) : e.depth <= chapterDepth;
   return { entries, chapterDepth, skip };
 }
 
 function restoreContext(state, page) {
   const { entries, chapterDepth } = state.outline;
   const prior = entries.filter((e) => e.page < page);
-  const ch = [...prior].reverse().find((e) => e.depth <= chapterDepth);
-  const sec = [...prior].reverse().find((e) => e.depth > chapterDepth);
+  const ch = [...prior].reverse().find((e) => e.chapter);
+  const sec = [...prior].reverse().find((e) => !e.chapter && e.depth > (ch?.depth ?? -1));
   if (ch) state.chapter = ch.title;
   if (sec && (!ch || sec.page >= ch.page)) state.section = sec.title;
   state.sectionKey = `${state.book.id}:r${page}`;
@@ -234,7 +237,7 @@ async function processPage(page, pn, state) {
     const pages = state.recent.get(normEdge(l.text)) || [];
     return pages.filter((p) => p !== pn && pn - p <= 6).length >= 2;
   };
-  const body = ordered.filter((l) => !(isEdge(l, H) && (/^[\divxlc\s.|–-]+$/i.test(l.text) || state.repeated.has(normEdge(l.text)) || wordCount(l.text) <= 8)) && !isRunningHead(l));
+  const body = ordered.filter((l) => l.caption || !(isEdge(l, H) && (/^[\divxlc\s.|–-]+$/i.test(l.text) || state.repeated.has(normEdge(l.text)) || wordCount(l.text) <= 8)) && !isRunningHead(l));
   for (const l of ordered) {
     if (wordCount(l.text) > 10) continue;
     const k = normEdge(l.text);
@@ -246,14 +249,14 @@ async function processPage(page, pn, state) {
 
   // 4. Figures & tables.
   const images = imageBoxes(ops, vp);
-  const regions = findRegions(body, images, W, H, state.body, twoCol);
+  const regions = findRegions(body, images, W, H, state.body, twoCol, (l) => isBodyText(l, state));
   const inRegion = (l) => regions.some((r) => l.x >= r.x0 - 2 && l.xEnd <= r.x1 + 2 && l.y >= r.y0 - 2 && l.y - l.size <= r.y1 + 2);
 
   // 5. Outline headings that start on this page.
   const { entries, chapterDepth } = state.outline;
   const outlineHere = entries.filter((e) => e.page === pn);
   const outlineTitles = new Map(outlineHere.map((e) => [norm(e.title), e]));
-  for (const e of outlineHere) if (e.depth <= chapterDepth && !matchesAnyLine(e.title, body)) setHeading(state, 1, e.title, pn, true);
+  for (const e of outlineHere) if (e.chapter && !matchesAnyLine(e.title, body)) setHeading(state, 1, e.title, pn, true);
 
   // 6. Walk lines: headings, paragraphs.
   let prevBody = null;
@@ -262,7 +265,7 @@ async function processPage(page, pn, state) {
     if (l.caption) { for (const r of regions) if (r.capLine === l) r.sectionKey = state.sectionKey; }
     if (inRegion(l) || l.caption || l.inCaption) continue;
     const o = outlineTitles.get(norm(l.text));
-    let level = o ? (o.depth <= chapterDepth ? 1 : 2) : headingLevel(l, body[i + 1], state.body);
+    let level = o ? (o.chapter ? 1 : 2) : headingLevel(l, body[i + 1], state.body);
     if (level === 1 && !o && entries.length) level = 2;
     if (level && BYLINE_RE.test(l.text)) { continue; } // chapter author lines
     if (level) {
@@ -281,6 +284,7 @@ async function processPage(page, pn, state) {
     prevBody = l;
   }
   if (regions.length && !state.dryRun) await cropRegions(page, pn, regions, state);
+  if (state.dryRun) for (const r of regions) state.figures.push({ page: pn, kind: r.kind, label: r.label, h: Math.round(r.y1 - r.y0), w: Math.round(r.x1 - r.x0) });
   // A paragraph that ends with terminal punctuation at the page end is finished;
   // otherwise it continues onto the next page.
   flushPara(state, false);
@@ -524,7 +528,7 @@ function imageBoxes(opList, vp) {
 }
 
 /** Locate figure/table regions anchored on their captions. Returns boxes in page units. */
-function findRegions(lines, images, W, H, body, twoCol) {
+function findRegions(lines, images, W, H, body, twoCol, isBody = () => true) {
   const regions = [];
   const used = new Set();
   for (let i = 0; i < lines.length; i++) {
@@ -537,6 +541,8 @@ function findRegions(lines, images, W, H, body, twoCol) {
     for (let j = i + 1; j < lines.length; j++) {
       const n = lines[j], last = capLines[capLines.length - 1];
       if (n.col !== l.col || n.y - last.y > last.size * 1.7 || n.caption || capLines.length > 12) break;
+      if (capLines.length > 1 && (n.fam !== l.fam || Math.abs(n.size - l.size) > 0.3)) break; // rows of a table, not caption
+      if (capLines.length === 1 && Math.abs(n.size - l.size) > 1.6) break;
       if (kind === 'table' && n.gaps > 0) break;
       capLines.push(n);
     }
@@ -558,8 +564,10 @@ function findRegions(lines, images, W, H, body, twoCol) {
         // Multi-panel figures: absorb other nearby images.
         images.forEach((b, k) => { if (!used.has(k) && b.y1 > box.y0 - 30 && b.y0 < box.y1 + 30 && b.x1 > box.x0 - 40 && b.x0 < box.x1 + 40) { box = union(box, b); used.add(k); } });
       } else {
-        // Vector figure: take the text-free gap above the caption in this column.
-        const above = lines.filter((m) => m !== l && m.col === l.col && m.y < cap.y0 && !m.caption && !m.inCaption);
+        // Vector figure (drawn, not an embedded image): the area above the caption up to the
+        // previous line of body prose. The figure's own labels are in another typeface and ignored.
+        const above = lines.filter((m) => m !== l && m.y < cap.y0 && !m.caption && !m.inCaption && isBody(m)
+          && (!twoCol || l.col === 0 ? m.xEnd > colX0 + 5 && m.x < colX1 - 5 : m.col === l.col || m.col === 0));
         const prevBottom = above.length ? Math.max(...above.map((m) => m.y)) + 3 : H * 0.07;
         if (cap.y0 - prevBottom > 60) box = { x0: colX0 + 10, x1: colX1 - 10, y0: prevBottom, y1: cap.y0 };
       }
@@ -585,7 +593,7 @@ function findRegions(lines, images, W, H, body, twoCol) {
         if (n.y < cap.y0) continue;
         if (n.caption || (n.bold && n.size >= body - 0.3 && n.gaps === 0) || n.size > body * 1.1) break;
         if (n.y - y1 > n.size * 3.5) break;
-        const isProse = Math.abs(n.size - body) < 0.4 && n.gaps === 0 && (n.xEnd - n.x) > (colX1 - colX0) * 0.7;
+        const isProse = isBody(n) && Math.abs(n.size - body) < 0.4 && n.gaps === 0 && (n.xEnd - n.x) > (colX1 - colX0) * 0.7;
         prose = isProse ? prose + 1 : 0;
         if (prose >= 2) break;
         if (!isProse) y1 = n.y + 2;

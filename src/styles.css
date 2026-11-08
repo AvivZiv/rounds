@@ -271,3 +271,95 @@ mark.key { text-decoration: underline dotted; text-decoration-color: var(--key);
   .lsec { padding-left: 14px; }
 }
 @media print { .reader-bar, .tabs, .lesson-foot, .outline { display: none; } body { background: #fff; } }
+
+/* ============================================================ READER v2 */
+.reader-bar { position: sticky; }
+.bar-mid { flex: 1; min-width: 0; display: grid; line-height: 1.2; }
+.bar-mid .bar-title { flex: none; }
+.bar-left { font: 12px var(--sans); color: var(--muted); }
+.read-progress { position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; background: transparent; }
+.read-progress span { display: block; height: 100%; width: 0; background: var(--accent); transition: width .15s linear; }
+
+.lesson { max-width: 36em; }
+.lesson-head h1 { font-size: 1.85em; margin-bottom: 2px; }
+.lesson-meta { font-size: 14px; }
+
+/* outline: a small table of contents */
+.outline { margin: 26px 0 40px; padding: 6px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.outline a { display: grid; grid-template-columns: 28px 1fr auto; align-items: center; gap: 10px; padding: 9px 4px; font: 500 15.5px var(--sans); }
+.outline .num { width: 22px; height: 22px; border-radius: 6px; background: var(--sec); color: var(--paper); font: 600 12px var(--sans); display: grid; place-items: center; }
+.outline .num .ico { width: 14px; height: 14px; }
+.outline .omin { color: var(--muted); font-size: 13px; font-weight: 400; }
+.outline .osupp .otitle { color: var(--ink-2); }
+
+/* sections */
+.lsec { margin-bottom: 56px; }
+.lsec-title { font-size: 1.3em; margin-bottom: 18px; }
+.source { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font: 12.5px/1.4 var(--sans); color: var(--muted); margin: 28px 0 10px; padding-top: 12px; border-top: 1px solid color-mix(in srgb, var(--line) 70%, transparent); }
+.source .ico { width: 15px; height: 15px; }
+.src-book { color: var(--ink-2); font-weight: 600; }
+.src-ch::before { content: '·'; margin-right: 8px; color: var(--line); }
+.lsec-title + .source { border-top: 0; margin-top: 0; padding-top: 0; }
+.book-sub { font: 600 .78em/1.3 var(--sans); letter-spacing: .06em; text-transform: uppercase; color: var(--ink-2); margin: 22px 0 8px; }
+.source + .book-sub { margin-top: 6px; }
+
+/* book-style paragraphs: indent instead of gaps, justified with hyphenation */
+.passage p { margin: 0; line-height: 1.66; text-align: justify; hyphens: auto; -webkit-hyphens: auto; text-wrap: pretty; }
+.passage p + p { text-indent: 1.4em; }
+.passage + .passage { margin-top: .9em; }
+.page-tag { font-size: 11px; opacity: .8; }
+
+/* figure references in the text */
+mark.figref { color: var(--accent); text-decoration: underline dotted; text-underline-offset: 3px; cursor: pointer; }
+mark.figref.highlight { color: inherit; }
+
+/* figures: cards that open full-screen */
+.fig { margin: 22px 0 28px; cursor: zoom-in; border-radius: 10px; }
+.fig:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
+.fig-img { border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,.08); max-height: 60vh; }
+.fig figcaption { font: 13px/1.5 var(--sans); margin-top: 8px; }
+.fig figcaption .muted { display: block; font-size: 12px; margin-top: 2px; }
+.fig.zoom .fig-img { max-height: 60vh; }
+
+/* generated note: quiet, clearly marked */
+.gen-note { background: none; border-left: 2px dashed var(--gen-ink); border-radius: 0; padding: 2px 0 2px 12px; margin: 0 0 20px; font: italic 14.5px/1.5 var(--sans); color: var(--gen-ink); }
+.gen-label { display: flex; gap: 4px; align-items: center; font: 600 10.5px var(--sans); font-style: normal; text-transform: uppercase; letter-spacing: .07em; margin-bottom: 2px; }
+.gen-cites { display: block; font-size: 12px; font-style: normal; opacity: .75; margin-top: 3px; }
+
+/* supplement */
+.supp .lsec-title { color: var(--ink-2); }
+.supp-intro { font: 14px var(--sans); color: var(--muted); margin: -8px 0 16px; }
+.supp-grid { display: grid; gap: 16px; }
+@media (min-width: 640px) { .supp-grid { grid-template-columns: 1fr 1fr; } }
+.fig.compact { margin: 0; padding: 10px; background: var(--card); border: 1px solid var(--line); }
+.fig.compact .fig-img { max-height: 220px; }
+.fig-missing { display: grid; gap: 4px; padding: 14px; border: 1px dashed var(--line); border-radius: 10px; font: 13.5px/1.45 var(--sans); color: var(--muted); align-content: start; }
+.fig-missing strong { color: var(--ink-2); }
+.flash { animation: flash 1.6s ease; }
+@keyframes flash { 0%, 40% { background: color-mix(in srgb, var(--accent) 18%, transparent); } 100% { background: transparent; } }
+
+/* full-screen figure viewer */
+.lightbox { position: fixed; inset: 0; z-index: 90; background: #12100d; display: grid; grid-template-rows: 1fr auto; }
+.lightbox[hidden] { display: none; }
+.lb-scroll { overflow: auto; display: grid; place-items: center; padding: 56px 12px 8px; }
+.lb-scroll img { max-width: 100%; max-height: calc(100vh - 160px); object-fit: contain; background: #fff; border-radius: 6px; cursor: zoom-in; }
+.lightbox.zoomed .lb-scroll { place-items: start; }
+.lightbox.zoomed .lb-scroll img { max-width: none; max-height: none; width: 200%; cursor: zoom-out; }
+.lb-cap { margin: 0; padding: 10px 18px calc(16px + env(safe-area-inset-bottom)); color: #e9e2d4; font: 13.5px/1.5 var(--sans); max-height: 30vh; overflow: auto; }
+.lb-close { position: absolute; top: calc(10px + env(safe-area-inset-top)); right: 12px; width: 40px; height: 40px; border-radius: 50%; border: 0; background: rgba(255,255,255,.14); color: #fff; font-size: 26px; line-height: 1; cursor: pointer; }
+body.lb-open { overflow: hidden; }
+
+@media (max-width: 520px) {
+  .passage p { text-align: left; }
+  .lesson-head h1 { font-size: 1.6em; }
+}
+
+/* ---- chosen design: chapter-style section headings, one accent colour, no margin rule */
+.lsec { padding-left: 0; }
+.lsec::before { display: none; }
+.lsec-title { display: grid; gap: 2px; color: var(--ink); font: 600 1.45em/1.2 var(--serif); padding-bottom: 12px; margin-bottom: 20px; border-bottom: 1px solid var(--line); }
+.lsec-num { background: none; color: var(--accent); padding: 0; top: 0; font: 600 13px var(--sans); letter-spacing: .1em; text-transform: uppercase; }
+.lsec-num::before { content: 'Part '; }
+.lsec-end { display: none; }
+.outline .num { background: none; color: var(--accent); border: 1.5px solid currentColor; }
+.supp .lsec-title { color: var(--ink); }

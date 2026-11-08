@@ -13,7 +13,7 @@ import { db } from '../db/index.js';
 import { embedQuery, embedQueries, embedPassages } from './embed.js';
 import { cosine, keywordScore, tokenize, wordCount, readingMinutes, sentenceSpans } from './text.js';
 
-export const LESSON_VERSION = 6;
+export const LESSON_VERSION = 7;
 
 const ROLES = [
   { id: 'overview', title: 'What it is', basic: true, kw: /\b(introduction|overview|definition|general|background|approach to)\b/i, q: (t) => `${t}: definition and overview` },
@@ -202,8 +202,7 @@ export async function buildLesson(item, depth, { books, settings, onStep = () =>
       const figs = figCache.get(b.book_id).filter((f) => !usedFigs.has(f.id) && figureBelongs(f, b));
       for (const f of figs.slice(0, 2)) {
         usedFigs.add(f.id); figCount++;
-        out.push({ type: 'figure', figure_id: f.id, kind: f.kind, label: f.label, caption: f.caption, image_path: f.image_path,
-          width: f.width, height: f.height, book_title: b.book_title, page: f.page });
+        out.push(figureBlock(f, b.book_id, b.book_title));
       }
     }
     s.blocks = out;
@@ -231,9 +230,48 @@ export async function buildLesson(item, depth, { books, settings, onStep = () =>
     s.blocks.unshift({ type: 'note', text, cites });
   }
 
+  // ---- supplement: every figure/table the passages mention that is not already shown
+  onStep('Collecting referenced figures');
+  const shown = new Set(sections.flatMap((s) => s.blocks.filter((b) => b.type === 'figure').map((b) => refKey(b.book_id, b.kind, b.label))));
+  const wanted = new Map(); // key -> {book_id, book_title, kind, label, cited_on}
+  for (const s of sections) for (const b of s.blocks) {
+    if (b.type !== 'passage') continue;
+    for (const r of figureRefs(b.text)) {
+      const key = refKey(b.book_id, r.kind, r.label);
+      if (!shown.has(key) && !wanted.has(key)) wanted.set(key, { book_id: b.book_id, book_title: b.book_title, kind: r.kind, label: r.label, cited_on: b.page_start });
+    }
+  }
+  const supplement = [];
+  for (const [bookId, refs] of groupBy([...wanted.values()], (r) => r.book_id)) {
+    const labels = [...new Set(refs.flatMap((r) => [r.label, r.label.replace(/-/g, '–')]))];
+    const found = await db.figuresByLabels(bookId, labels);
+    for (const r of refs.sort((a, b) => a.kind.localeCompare(b.kind) || labelOrder(a.label) - labelOrder(b.label))) {
+      const f = found.find((x) => refKey(bookId, x.kind, x.label) === refKey(bookId, r.kind, r.label));
+      supplement.push(f ? { ...figureBlock(f, bookId, r.book_title), cited_on: r.cited_on }
+        : { type: 'missing', book_id: bookId, book_title: r.book_title, kind: r.kind, label: r.label, cited_on: r.cited_on });
+    }
+  }
+  if (supplement.length) sections.push({ role: 'supplement', title: 'Figures & tables', supplement: true, blocks: supplement });
+
   const words = passages.reduce((a, p) => a + (p.word_count || wordCount(p.text)), 0);
   return { ...base, status: 'ok', sections, words, figures: figCount, minutes: readingMinutes(words, figCount), emphasised: !!cfg.emphasised };
 }
+
+function figureBlock(f, bookId, bookTitle) {
+  return { type: 'figure', figure_id: f.id, book_id: bookId, kind: f.kind, label: f.label, caption: f.caption, image_path: f.image_path,
+    width: f.width, height: f.height, book_title: bookTitle, page: f.page };
+}
+
+/** "Fig. 21-4", "Figures 3.2", "Table 28-1A" in a passage -> [{kind, label}] (sub-panel letters dropped). */
+export function figureRefs(text) {
+  const out = [];
+  for (const m of text.matchAll(FIG_REF_RE)) out.push({ kind: /^tab/i.test(m[1]) ? 'table' : 'figure', label: normLabel(m[2]), index: m.index, length: m[0].length });
+  return out;
+}
+export const FIG_REF_RE = /\b(Figs?\.?|Figures?|FIGURES?|Tables?|TABLES?|Tab\.)\s+(\d+[A-Za-z]?(?:\s?[-–—.]\s?\d+[A-Za-z]?)*)/g;
+export const normLabel = (l) => (l || '').replace(/\s+/g, '').replace(/[–—]/g, '-').replace(/[A-Za-z]$/, '');
+export const refKey = (bookId, kind, label) => `${bookId}|${kind}|${normLabel(label)}`;
+const labelOrder = (l) => l.split(/[-.]/).reduce((a, n) => a * 1000 + (parseInt(n, 10) || 0), 0);
 
 /** A figure belongs next to a passage if the passage cites it, or it sits on the passage's pages in the same section. */
 function figureBelongs(f, p) {

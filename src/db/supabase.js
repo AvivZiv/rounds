@@ -113,6 +113,10 @@ export const supabase = {
     return signedUrl;
   },
   async figuresForBook(bookId) { return check(await sb.from('figures').select('*').eq('book_id', bookId)); },
+  async figuresByLabels(bookId, labels) {
+    if (!labels.length) return [];
+    return check(await sb.from('figures').select('*').eq('book_id', bookId).in('label', labels.slice(0, 200)));
+  },
   async figuresForPages(bookId, pages) {
     if (!pages.length) return [];
     return check(await sb.from('figures').select('*').eq('book_id', bookId).in('page', pages.slice(0, 300)));
