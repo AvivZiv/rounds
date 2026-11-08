@@ -13,7 +13,7 @@ import { db } from '../db/index.js';
 import { embedQuery, embedQueries, embedPassages } from './embed.js';
 import { cosine, keywordScore, tokenize, wordCount, readingMinutes, sentenceSpans } from './text.js';
 
-export const LESSON_VERSION = 5;
+export const LESSON_VERSION = 6;
 
 const ROLES = [
   { id: 'overview', title: 'What it is', basic: true, kw: /\b(introduction|overview|definition|general|background|approach to)\b/i, q: (t) => `${t}: definition and overview` },
@@ -211,7 +211,8 @@ export async function buildLesson(item, depth, { books, settings, onStep = () =>
     const chapters = new Set(ps.map((p) => `${p.book_id}|${p.chapter}`));
     const span = Math.max(...ps.map((p) => p.page_end)) - Math.min(...ps.map((p) => p.page_start));
     if (ps.length < 2 || (books_.size < 2 && chapters.size < 2 && span < 25)) continue;
-    const cites = ps.map((p) => ({ book_title: p.book_title, page: p.page_start }));
+    // One cite per distinct book page.
+    const cites = [...new Map(ps.map((p) => [`${p.book_id}|${p.page_start}`, { book_title: p.book_title, page: p.page_start }])).values()];
     const citeText = (p) => `${shortTitle(p.book_title)} p. ${p.page_start}`;
     let text = await db.connectNote({
       topic, section: s.title, level: settings?.career_interest || 'general medical student',
@@ -266,7 +267,13 @@ export async function keySentences(content, topic) {
 
 function groupBy(arr, fn) { const m = new Map(); for (const x of arr) { const k = fn(x); if (!m.has(k)) m.set(k, []); m.get(k).push(x); } return m; }
 const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-export const shortTitle = (t) => (t || '').replace(/\.pdf$/i, '').split(/[:(–—-]/)[0].trim().slice(0, 40);
+export function shortTitle(t) {
+  const s = cleanTitle(t).split(/[:–—]/)[0].trim();
+  if (s.length <= 42) return s;
+  return s.slice(0, 42).replace(/\s+\S*$/, '') + '…';
+}
+/** Strip download-site noise from file-name titles: "(z-lib.org)", "(1)", author lists in brackets. */
+export const cleanTitle = (t) => (t || '').replace(/\.pdf$/i, '').replace(/\s*[([][^)\]]*[)\]]/g, '').replace(/[_]+/g, ' ').replace(/\s+/g, ' ').trim();
 const listJoin = (a) => (a.length <= 1 ? a.join('') : a.slice(0, -1).join(', ') + ' and ' + a[a.length - 1]);
 
 /** Split a multi-part topic into its parts (always keeping the full phrase first). */

@@ -60,7 +60,7 @@ export async function ingestBook(book, file, onProgress = () => {}, opts = {}) {
   await db.updateBook(book.id, { body_font_size: stats.body });
 
   const state = {
-    book, body: stats.body, repeated: stats.repeated, outline,
+    book, body: stats.body, repeated: stats.repeated, bodyFamilies: stats.bodyFamilies, outline,
     chapter: null, section: null, sectionKey: `${book.id}:start`, headingCount: 0,
     para: null,          // paragraph being built (may cross page/column)
     chunk: null,         // chunk being built
@@ -159,16 +159,18 @@ async function analyseFonts(pdf) {
   const sample = [...new Set(Array.from({ length: Math.min(40, n) }, (_, i) => 1 + Math.floor((i * n) / Math.min(40, n))))];
   const hist = new Map();
   const edgeCounts = new Map();
+  const famBySize = [];
   let chars = 0;
   for (const pn of sample) {
     const page = await pdf.getPage(pn);
     const vp = page.getViewport({ scale: 1 });
-    const tc = await page.getTextContent();
+    const [tc] = await Promise.all([page.getTextContent(), page.getOperatorList()]); // op list loads font names
     for (const it of tc.items) {
       if (!it.str?.trim()) continue;
       const t = pdfjs.Util.transform(vp.transform, it.transform);
       const size = Math.round(Math.hypot(t[2], t[3]) * 2) / 2;
       hist.set(size, (hist.get(size) || 0) + it.str.length);
+      famBySize.push([size, fontFamily(page, it.fontName), it.str.length]);
       chars += it.str.length;
       const y = t[5];
       if (y < vp.height * 0.08 || y > vp.height * 0.93) {
@@ -180,7 +182,22 @@ async function analyseFonts(pdf) {
   }
   const body = [...hist.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] || 10;
   const repeated = new Set([...edgeCounts.entries()].filter(([, c]) => c >= Math.max(3, sample.length * 0.2)).map(([k]) => k));
-  return { body, repeated, charsPerPage: chars / sample.length };
+  // Body typeface(s): families carrying >= 15% of body-size text. Figure labels, captions and
+  // tables are usually set in a different face or size and are kept out of passages.
+  const famChars = new Map();
+  let bodyChars = 0;
+  for (const [size, fam, n] of famBySize) if (Math.abs(size - body) <= 0.5) { famChars.set(fam, (famChars.get(fam) || 0) + n); bodyChars += n; }
+  const bodyFamilies = new Set([...famChars.entries()].filter(([f, n]) => f && n >= bodyChars * 0.15).map(([f]) => f));
+  return { body, repeated, bodyFamilies, charsPerPage: chars / sample.length };
+}
+/** "YOIUHV+MinionPro-Regular" -> "minion": subset prefix and style removed, so bold/italic share a family. */
+function fontFamily(page, fontName) {
+  let name = '';
+  try { if (page.commonObjs.has(fontName)) name = page.commonObjs.get(fontName)?.name || ''; } catch { /* not loaded */ }
+  if (!name) return '';
+  return name.replace(/^[A-Z]{6}\+/, '').split(/[-,]/)[0]
+    .replace(/(Bold|Italic|Oblique|Semibold|Regular|Roman|Medium|Light)+$/i, '')
+    .replace(/(MT|PS|Std|Pro|LT|OT)+$/g, '').toLowerCase();
 }
 const normEdge = (s) => s.toLowerCase().replace(/[0-9ivxlc]+/g, '#').replace(/\s+/g, ' ').trim();
 const clean = (s) => (s || '').replace(/\s+/g, ' ').trim();
@@ -202,7 +219,7 @@ async function processPage(page, pn, state) {
     if (size < 3) continue;
     if (Math.abs(t[1]) > 0.1 * size || Math.abs(t[2]) > 0.1 * size) continue; // rotated text: side tabs, margins
     const width = it.width * (size / Math.hypot(it.transform[2], it.transform[3]) || 1);
-    items.push({ str: it.str, x: t[4], y: t[5], size, w: width, bold: isBold(page, it.fontName, tc.styles) });
+    items.push({ str: it.str, x: t[4], y: t[5], size, w: width, bold: isBold(page, it.fontName, tc.styles), fam: fontFamily(page, it.fontName) });
   }
 
   // 2. Column layout, lines, reading order.
@@ -239,6 +256,7 @@ async function processPage(page, pn, state) {
   for (const e of outlineHere) if (e.depth <= chapterDepth && !matchesAnyLine(e.title, body)) setHeading(state, 1, e.title, pn, true);
 
   // 6. Walk lines: headings, paragraphs.
+  let prevBody = null;
   for (let i = 0; i < body.length; i++) {
     const l = body[i];
     if (l.caption) { for (const r of regions) if (r.capLine === l) r.sectionKey = state.sectionKey; }
@@ -258,7 +276,9 @@ async function processPage(page, pn, state) {
       continue;
     }
     if (state.inReferences) continue;
-    addLine(state, l, body[i - 1], pn);
+    if (!isBodyText(l, state)) continue; // figure labels, captions, tables, sidebars
+    addLine(state, l, prevBody, pn);
+    prevBody = l;
   }
   if (regions.length && !state.dryRun) await cropRegions(page, pn, regions, state);
   // A paragraph that ends with terminal punctuation at the page end is finished;
@@ -279,7 +299,10 @@ function isBold(page, fontName, styles) {
 function detectTwoColumns(items, W, body) {
   let left = 0, right = 0, span = 0;
   for (const it of items) {
-    if (Math.abs(it.size - body) > 1) continue;
+    // Count all readable text, not only body size: a column filled by a table or figure
+    // (smaller type) is still a column, and treating the page as single-column would
+    // interleave table rows with the prose beside them.
+    if (it.size < body * 0.7) continue;
     const x1 = it.x + it.w;
     if (x1 < W * 0.53) left += it.str.length;
     else if (it.x > W * 0.47) right += it.str.length;
@@ -303,14 +326,16 @@ function buildLines(items, W, twoCol, body) {
       line.text += (gap > it.size * 0.15 && !line.text.endsWith(' ') && !it.str.startsWith(' ') ? ' ' : '') + it.str;
       line.xEnd = Math.max(line.xEnd, it.x + it.w);
       line.sizes.set(Math.round(it.size * 2) / 2, (line.sizes.get(Math.round(it.size * 2) / 2) || 0) + it.str.length);
+      line.fams.set(it.fam, (line.fams.get(it.fam) || 0) + it.str.length);
       line.bold = line.bold && it.bold;
       line.n++;
     } else {
-      lines.push({ text: it.str, x: it.x, xEnd: it.x + it.w, y: it.y, size: it.size, bold: it.bold, col: c, gaps: 0, n: 1, sizes: new Map([[Math.round(it.size * 2) / 2, it.str.length]]) });
+      lines.push({ text: it.str, x: it.x, xEnd: it.x + it.w, y: it.y, size: it.size, bold: it.bold, col: c, gaps: 0, n: 1, sizes: new Map([[Math.round(it.size * 2) / 2, it.str.length]]), fams: new Map([[it.fam, it.str.length]]) });
     }
   }
   for (const l of lines) {
     l.size = [...l.sizes.entries()].sort((a, b) => b[1] - a[1])[0][0];
+    l.fam = [...l.fams.entries()].sort((a, b) => b[1] - a[1])[0][0];
     l.text = l.text.replace(/\s+/g, ' ').trim();
     const m = l.text.match(CAPTION_RE);
     const after = m ? l.text.slice(m[0].length) : '';
@@ -332,6 +357,12 @@ function orderLines(lines, twoCol) {
 const isEdge = (l, H) => l.y < H * 0.07 || l.y > H * 0.94;
 const norm = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, '');
 function matchesAnyLine(title, lines) { const t = norm(title); return t.length > 3 && lines.some((l) => norm(l.text) === t || (norm(l.text).length > 6 && t.startsWith(norm(l.text)))); }
+
+function isBodyText(l, state) {
+  if (Math.abs(l.size - state.body) > 0.75) return false;
+  const fams = state.bodyFamilies;
+  return !fams || !fams.size || !l.fam || fams.has(l.fam);
+}
 
 function headingLevel(l, next, body) {
   const words = wordCount(l.text);
@@ -397,8 +428,16 @@ function flushPara(state, force) {
   if (!force && !/[.!?:”")\]]$/.test(p.lastText)) { p.continued = true; return; }
   state.para = null;
   const text = p.text.trim();
-  if (wordCount(text) < 4) return;
+  if (isFragment(text)) return;
   addParagraph(state, text, p.page, p.pageEnd);
+}
+
+function isFragment(text) {
+  const words = text.split(/\s+/);
+  if (words.length < 4) return true;
+  if (words.length < 15 && !/[.!?:;”")\]]$/.test(text)) return true; // short and unfinished: a label or table cell
+  const numeric = words.filter((w) => /^[\d.,%~<>±–-]+[a-zA-Z]{0,2}$/.test(w)).length;
+  return numeric / words.length > 0.35; // axis ticks, table rows
 }
 
 function addParagraph(state, text, page, pageEnd) {
@@ -598,17 +637,17 @@ export async function debugPage(data, pn, body = 10) {
     if (!it.str || !it.str.trim()) continue;
     const t = pdfjs.Util.transform(vp.transform, it.transform);
     const size = Math.hypot(t[2], t[3]);
-    items.push({ str: it.str, x: t[4], y: t[5], size, w: it.width * (size / Math.hypot(it.transform[2], it.transform[3]) || 1), bold: isBold(page, it.fontName, tc.styles), font: page.commonObjs.has(it.fontName) ? page.commonObjs.get(it.fontName).name : it.fontName });
+    items.push({ str: it.str, x: t[4], y: t[5], size, w: it.width * (size / Math.hypot(it.transform[2], it.transform[3]) || 1), bold: isBold(page, it.fontName, tc.styles), fam: fontFamily(page, it.fontName), font: page.commonObjs.has(it.fontName) ? page.commonObjs.get(it.fontName).name : it.fontName });
   }
   const twoCol = detectTwoColumns(items, vp.width, body);
   const lines = orderLines(buildLines(items, vp.width, twoCol, body), twoCol);
-  return { twoCol, images: imageBoxes(ops, vp), fonts: [...new Set(items.map((i) => i.font + (i.bold ? '*' : '')))], lines: lines.map((l) => `${l.col} y${Math.round(l.y)} x${Math.round(l.x)}-${Math.round(l.xEnd)} s${l.size.toFixed(1)}${l.bold ? 'B' : ''}${l.caption ? 'CAP' : ''} ${l.text.slice(0, 70)}`) };
+  return { twoCol, images: imageBoxes(ops, vp), fonts: [...new Set(items.map((i) => i.font + (i.bold ? '*' : '')))], lines: lines.map((l) => `${l.col} y${Math.round(l.y)} x${Math.round(l.x)}-${Math.round(l.xEnd)} s${l.size.toFixed(1)}${l.bold ? "B" : ""}${l.caption ? "CAP" : ""} g${l.gaps} f=${l.fam} ${l.text.slice(0, 70)}`) };
 }
 
 /** Dev helper: run the full page walk without saving anything; returns paragraphs/chunks. */
 export async function debugWalk(data, body = 10) {
   const pdf = await pdfjs.getDocument({ data, isEvalSupported: false }).promise;
-  const state = { book: { id: 'dbg' }, body, repeated: new Set(), outline: await flattenOutline(pdf), chapter: null, section: null, sectionKey: 'start',
+  const state = { book: { id: 'dbg' }, body, repeated: new Set(), bodyFamilies: (await analyseFonts(pdf)).bodyFamilies, outline: await flattenOutline(pdf), chapter: null, section: null, sectionKey: 'start',
     headingCount: 0, para: null, chunk: null, ready: [], figures: [], sections: [], dryRun: true };
   for (let pn = 1; pn <= pdf.numPages; pn++) await processPage(await pdf.getPage(pn), pn, state);
   flushPara(state, true); flushChunk(state);

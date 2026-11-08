@@ -95,7 +95,7 @@ function lessonHTML(item, c, depth) {
         const src = `${b.book_id}|${b.chapter}|${b.section}`;
         const pages = b.page_start === b.page_end ? `p. ${b.page_start}` : `pp. ${b.page_start}–${b.page_end}`;
         if (src !== lastSrc) {
-          html += `<div class="source">${icon('book')} <span class="src-book">${esc(b.book_title)}</span>${b.chapter ? ` · <span>${esc(b.chapter)}</span>` : ''}${b.section && b.section !== b.chapter ? ` · <span>${esc(b.section)}</span>` : ''}</div>`;
+          html += `<div class="source">${icon('book')} <span class="src-book">${esc(shortTitle(b.book_title))}</span>${b.chapter ? ` · <span>${esc(b.chapter)}</span>` : ''}${b.section && b.section !== b.chapter ? ` · <span>${esc(b.section)}</span>` : ''}</div>`;
           lastSrc = src;
         }
         html += `<div class="passage" data-chunk="${b.chunk_id}"><span class="page-tag">${pages}</span>${paragraphs(b.text)}</div>`;

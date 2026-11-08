@@ -2,6 +2,7 @@ import { store, queueMissingEstimates } from '../store.js';
 import { db } from '../db/index.js';
 import { esc, icon, $, toast, confirmDialog } from '../ui.js';
 import { onModelProgress } from '../lib/embed.js';
+import { cleanTitle } from '../lib/lesson.js';
 
 // Ingestion jobs live outside the view so they survive navigation.
 const jobs = new Map(); // bookId -> {phase, page, pages, msg, ctrl}
@@ -88,7 +89,7 @@ export function renderLibrary(root) {
 
   $('.upload input', root).addEventListener('change', async (e) => {
     for (const file of e.target.files) {
-      const title = file.name.replace(/\.pdf$/i, '').replace(/[_]+/g, ' ');
+      const title = cleanTitle(file.name) || file.name;
       const book = await db.createBook({ title, file_size: file.size });
       store.books.push(book);
       enqueue(book, file);
