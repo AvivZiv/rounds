@@ -12,6 +12,7 @@ const parseVec = (v) => (typeof v === 'string' ? Float32Array.from(JSON.parse(v)
 const now = () => new Date().toISOString();
 
 const urlCache = new Map(); // path -> {url, exp}
+let noteUnavailable = false;
 let userId = null;
 
 async function uidPrefix() {
@@ -112,6 +113,10 @@ export const supabase = {
     return signedUrl;
   },
   async figuresForBook(bookId) { return check(await sb.from('figures').select('*').eq('book_id', bookId)); },
+  async figuresForPages(bookId, pages) {
+    if (!pages.length) return [];
+    return check(await sb.from('figures').select('*').eq('book_id', bookId).in('page', pages.slice(0, 300)));
+  },
 
   async searchChunks(embedding, queryText, k = 60, bookIds = null) {
     return check(await sb.rpc('match_chunks', {
@@ -146,11 +151,13 @@ export const supabase = {
   },
 
   // ---- optional generated connecting note via Edge Function (returns null if not deployed/configured)
+  // Optional: stops trying for this session once the function turns out not to be deployed or configured.
   async connectNote(payload) {
+    if (noteUnavailable) return null;
     try {
       const { data, error } = await sb.functions.invoke('connect-note', { body: payload });
-      if (error) return null;
+      if (error || data?.reason === 'no_api_key') { noteUnavailable = true; return null; }
       return data?.note || null;
-    } catch { return null; }
+    } catch { noteUnavailable = true; return null; }
   },
 };

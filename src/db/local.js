@@ -129,6 +129,7 @@ export const local = {
   },
   async figureUrl(path) { const f = await get('files', path); return f ? URL.createObjectURL(f.blob) : null; },
   async figuresForBook(bookId) { return byIndex('figures', 'book_id', bookId); },
+  async figuresForPages(bookId, pages) { const set = new Set(pages); return (await byIndex('figures', 'book_id', bookId)).filter((f) => set.has(f.page)); },
 
   /** Hybrid search: vector similarity + keyword overlap, fused by reciprocal rank. */
   async searchChunks(embedding, queryText, k = 60, bookIds = null) {

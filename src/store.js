@@ -23,7 +23,7 @@ export const store = {
   async addItem(row) {
     const item = await db.createItem({ list_id: this.defaultList()?.id, ...row });
     this.items.push(item); this.emit();
-    queueEstimate(item.id);
+    queueEstimate(item.id, { front: true });
     return item;
   },
   async updateItem(id, patch) {
@@ -31,7 +31,7 @@ export const store = {
     const item = await db.updateItem(id, patch);
     this.items = this.items.map((i) => (i.id === id ? item : i)); this.emit();
     if (before && (patch.title && patch.title !== before.title || 'preferred_book_id' in patch && patch.preferred_book_id !== before.preferred_book_id)) {
-      await invalidate(id); queueEstimate(id);
+      await invalidate(id); queueEstimate(id, { front: true });
     }
     return item;
   },
@@ -73,7 +73,13 @@ async function invalidate(itemId) {
 // Background estimates: build both depths for items that have none yet (one at a time).
 const queue = [];
 let running = false;
-export function queueEstimate(id) { if (!queue.includes(id)) queue.push(id); pump(); }
+/** front: the item the user is looking at or just changed goes ahead of background work. */
+export function queueEstimate(id, { front = false } = {}) {
+  const i = queue.indexOf(id);
+  if (i >= 0) { if (!front) return; queue.splice(i, 1); }
+  front ? queue.unshift(id) : queue.push(id);
+  pump();
+}
 export function queueMissingEstimates() {
   if (!store.books.some((b) => b.status === 'ready')) return;
   for (const i of store.items) if (i.status === 'open' && (i.est_basic_min == null || i.est_expanded_min == null) && i.coverage !== 'none') queueEstimate(i.id);

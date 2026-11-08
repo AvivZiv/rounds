@@ -1,4 +1,4 @@
-import { store, getLesson } from '../store.js';
+import { store, getLesson, queueEstimate } from '../store.js';
 import { esc, icon, $, toast, confirmDialog, todayISO, addDays, dueLabel } from '../ui.js';
 import { formatMinutes } from '../lib/text.js';
 
@@ -7,6 +7,9 @@ export function renderItem(root, id) {
   if (!item) { root.innerHTML = '<p class="empty">Item not found.</p>'; return; }
   const list = store.list(item.list_id);
   const hasBooks = store.books.some((b) => b.status === 'ready');
+  if (hasBooks && item.status === 'open' && item.coverage !== 'none' && (item.est_basic_min == null || item.est_expanded_min == null)) {
+    queueEstimate(item.id, { front: true }); // opened item is estimated first
+  }
   const opt = (v, cur, label) => `<option value="${esc(v)}" ${v === (cur ?? '') ? 'selected' : ''}>${esc(label)}</option>`;
   const readBtn = (depth, mins) => `
     <a class="read-btn ${item.depth === depth ? 'preferred' : ''}" href="#/read/${item.id}/${depth}">

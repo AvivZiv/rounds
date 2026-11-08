@@ -193,7 +193,12 @@ export async function buildLesson(item, depth, { books, settings, onStep = () =>
     for (const b of s.blocks) {
       out.push(b);
       if (figCount >= cfg.figures) continue;
-      if (!figCache.has(b.book_id)) figCache.set(b.book_id, await db.figuresForBook(b.book_id));
+      if (!figCache.has(b.book_id)) {
+        // Figures can sit up to a few pages from the passage that cites them.
+        const pages = new Set();
+        for (const p of passages) if (p.book_id === b.book_id) for (let k = p.page_start - 6; k <= p.page_end + 6; k++) if (k > 0) pages.add(k);
+        figCache.set(b.book_id, await db.figuresForPages(b.book_id, [...pages]));
+      }
       const figs = figCache.get(b.book_id).filter((f) => !usedFigs.has(f.id) && figureBelongs(f, b));
       for (const f of figs.slice(0, 2)) {
         usedFigs.add(f.id); figCount++;
