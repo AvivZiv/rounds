@@ -21,10 +21,15 @@ function getWorker() {
 
 export function onModelProgress(fn) { listeners.add(fn); return () => listeners.delete(fn); }
 
-/** Embed passages (documents). Batches internally. */
-export async function embedPassages(texts, batch = 16) {
-  const out = [];
-  for (let i = 0; i < texts.length; i += batch) out.push(...(await call(texts.slice(i, i + batch))));
+/** Embed passages (documents). Similar lengths are batched together (less padding); order is preserved. */
+export async function embedPassages(texts, group = 256) {
+  const order = texts.map((t, i) => i).sort((a, b) => texts[a].length - texts[b].length);
+  const out = new Array(texts.length);
+  for (let i = 0; i < order.length; i += group) {
+    const idx = order.slice(i, i + group);
+    const vecs = await call(idx.map((k) => texts[k]));
+    idx.forEach((k, j) => (out[k] = vecs[j]));
+  }
   return out;
 }
 

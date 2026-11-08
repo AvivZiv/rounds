@@ -16,11 +16,13 @@ import { MAX_STORED_PDF_BYTES } from '../config.js';
 
 pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
 
-const PAGE_BATCH = 8;
+const PAGE_BATCH = 16;
 const MIN_CHUNK_WORDS = 60;
 const MAX_CHUNK_WORDS = 320;
 const CAPTION_RE = /^(fig(?:ure)?s?\.?|table|tab\.)\s*([0-9]+[A-Za-z]?(?:\s*[-.–—]\s*[0-9]+[A-Za-z]?)*)/i;
 const CROP_SCALE = 2;
+const BYLINE_RE = /^((and\s+)?[A-Z][\w'’-]+(\s+[A-Z]\.)+\s+[A-Z][\w'’-]+(,\s*(MD|PhD|MPH|DO|MBBS|FRCP)\.?)*,?\s*)+$/;
+const REFERENCES_RE = /^(further reading|references|suggested reading|bibliography|selected readings?)\b/i;
 
 /**
  * @param {object} book   db row
@@ -70,8 +72,10 @@ export async function ingestBook(book, file, onProgress = () => {}, opts = {}) {
   const start = (book.processed_pages || 0) + 1;
   if (start > 1) restoreContext(state, start);
 
+  // Pipeline: while one batch is embedded and saved, the next pages are already being read.
+  let saving = Promise.resolve();
   for (let p0 = start; p0 <= pages; p0 += PAGE_BATCH) {
-    if (opts.signal?.aborted) throw new DOMException('Cancelled', 'AbortError');
+    if (opts.signal?.aborted) { await saving; throw new DOMException('Cancelled', 'AbortError'); }
     const p1 = Math.min(pages, p0 + PAGE_BATCH - 1);
     for (let pn = p0; pn <= p1; pn++) {
       onProgress({ phase: 'pages', page: pn, pages });
@@ -79,25 +83,26 @@ export async function ingestBook(book, file, onProgress = () => {}, opts = {}) {
       try { await processPage(page, pn, state); } finally { page.cleanup(); }
     }
     if (p1 === pages) { flushPara(state, true); flushChunk(state); }
-    await persist(state, onProgress, pages);
-    await db.updateBook(book.id, { processed_pages: p1 });
+    const batch = { sections: state.sections, ready: state.ready, figures: state.figures };
+    state.sections = []; state.ready = []; state.figures = [];
+    await saving; // at most one batch in flight; processed_pages only advances after a batch is saved
+    saving = persist(book, batch).then(() => db.updateBook(book.id, { processed_pages: p1 }));
   }
+  await saving;
   await pdf.destroy();
   return db.updateBook(book.id, { status: 'ready', processed_pages: pages });
 }
 
 // ------------------------------------------------------------------ persistence
-async function persist(state, onProgress, pages) {
-  const { book } = state;
-  if (state.sections.length) { await db.insertSections(state.sections); state.sections = []; }
-  if (state.ready.length) {
-    onProgress({ phase: 'embed', msg: `${state.ready.length} passages` , pages });
-    const texts = state.ready.map((c) => `${c.chapter || ''}${c.section ? ' — ' + c.section : ''}\n${c.text}`.split(/\s+/).slice(0, 360).join(' '));
+async function persist(book, { sections, ready, figures }) {
+  if (sections.length) await db.insertSections(sections);
+  if (ready.length) {
+    // Heading + start of the passage; the embedder keeps the first ~160 tokens.
+    const texts = ready.map((c) => `${c.chapter || ''}${c.section ? ' — ' + c.section : ''}\n${c.text}`.split(/\s+/).slice(0, 200).join(' '));
     const vecs = await embedPassages(texts);
-    await db.insertChunks(state.ready.map((c, i) => ({ ...c, book_id: book.id, embedding: vecs[i] })));
-    state.ready = [];
+    await db.insertChunks(ready.map((c, i) => ({ ...c, book_id: book.id, embedding: vecs[i] })));
   }
-  if (state.figures.length) { await db.insertFigures(state.figures.map((f) => ({ ...f, book_id: book.id }))); state.figures = []; }
+  if (figures.length) await db.insertFigures(figures.map((f) => ({ ...f, book_id: book.id })));
 }
 
 // ------------------------------------------------------------------ outline
@@ -120,8 +125,22 @@ async function flattenOutline(pdf) {
   await walk(raw, 0);
   // If the top level is "Parts" (few entries) and the next level is chapters, use depth 1.
   const c0 = out.filter((e) => e.depth === 0).length, c1 = out.filter((e) => e.depth === 1).length;
-  const chapterDepth = c0 < 15 && c1 > 2 * c0 ? 1 : 0;
-  return { entries: out.sort((a, b) => a.page - b.page || a.depth - b.depth), chapterDepth };
+  let chapterDepth = c0 < 15 && c1 > 2 * c0 ? 1 : 0;
+  for (let d = 0; d <= 2; d++) {
+    const at = out.filter((e) => e.depth === d);
+    const numbered = at.filter((e) => /^(chapter\s+)?\d{1,4}[.:]?\s+\S/i.test(e.title)).length;
+    if (at.length >= 5 && numbered >= at.length * 0.5) { chapterDepth = d; break; }
+  }
+  const entries = out.sort((a, b) => a.page - b.page || a.depth - b.depth);
+  // Front/back matter (contents, contributors, index...) is keyword-dense but never lesson material.
+  const MATTER = /^(cover|title( page)?|half title|copyright|(table of )?contents|contributors|preface|foreword|acknowledg|dedication|index|related resources|about the (author|editor)s?|abbreviations)\b/i;
+  const skip = [];
+  entries.forEach((e, i) => {
+    if (!MATTER.test(e.title)) return;
+    const next = entries.slice(i + 1).find((n) => n.depth <= e.depth && n.page > e.page);
+    skip.push([e.page, next ? next.page - 1 : Infinity]);
+  });
+  return { entries, chapterDepth, skip };
 }
 
 function restoreContext(state, page) {
@@ -168,6 +187,8 @@ const clean = (s) => (s || '').replace(/\s+/g, ' ').trim();
 
 // ------------------------------------------------------------------ page processing
 async function processPage(page, pn, state) {
+  if (state.outline.skip?.some(([a, b]) => pn >= a && pn <= b)) { flushPara(state, true); flushChunk(state); state.skipping = true; return; }
+  if (state.skipping) { state.skipping = false; state.section = null; }
   const vp = page.getViewport({ scale: 1 });
   const W = vp.width, H = vp.height;
   const [tc, ops] = await Promise.all([page.getTextContent(), page.getOperatorList()]);
@@ -179,6 +200,7 @@ async function processPage(page, pn, state) {
     const t = pdfjs.Util.transform(vp.transform, it.transform);
     const size = Math.hypot(t[2], t[3]);
     if (size < 3) continue;
+    if (Math.abs(t[1]) > 0.1 * size || Math.abs(t[2]) > 0.1 * size) continue; // rotated text: side tabs, margins
     const width = it.width * (size / Math.hypot(it.transform[2], it.transform[3]) || 1);
     items.push({ str: it.str, x: t[4], y: t[5], size, w: width, bold: isBold(page, it.fontName, tc.styles) });
   }
@@ -189,7 +211,21 @@ async function processPage(page, pn, state) {
   const ordered = orderLines(lines, twoCol);
 
   // 3. Drop running headers/footers and page numbers.
-  const body = ordered.filter((l) => !(isEdge(l, H) && (/^[\divxlc\s.|–-]+$/i.test(l.text) || state.repeated.has(normEdge(l.text)) || wordCount(l.text) <= 8)));
+  state.recent ??= new Map(); // normalised short line -> last pages it appeared on
+  const isRunningHead = (l) => {
+    if (wordCount(l.text) > 10) return false;
+    const pages = state.recent.get(normEdge(l.text)) || [];
+    return pages.filter((p) => p !== pn && pn - p <= 6).length >= 2;
+  };
+  const body = ordered.filter((l) => !(isEdge(l, H) && (/^[\divxlc\s.|–-]+$/i.test(l.text) || state.repeated.has(normEdge(l.text)) || wordCount(l.text) <= 8)) && !isRunningHead(l));
+  for (const l of ordered) {
+    if (wordCount(l.text) > 10) continue;
+    const k = normEdge(l.text);
+    const pages = (state.recent.get(k) || []).filter((p) => pn - p <= 6);
+    if (!pages.includes(pn)) pages.push(pn);
+    state.recent.set(k, pages);
+  }
+  if (state.recent.size > 5000) for (const [k, v] of state.recent) if (v.every((p) => pn - p > 6)) state.recent.delete(k);
 
   // 4. Figures & tables.
   const images = imageBoxes(ops, vp);
@@ -208,7 +244,9 @@ async function processPage(page, pn, state) {
     if (l.caption) { for (const r of regions) if (r.capLine === l) r.sectionKey = state.sectionKey; }
     if (inRegion(l) || l.caption || l.inCaption) continue;
     const o = outlineTitles.get(norm(l.text));
-    const level = o ? (o.depth <= chapterDepth ? 1 : 2) : headingLevel(l, body[i + 1], state.body);
+    let level = o ? (o.depth <= chapterDepth ? 1 : 2) : headingLevel(l, body[i + 1], state.body);
+    if (level === 1 && !o && entries.length) level = 2;
+    if (level && BYLINE_RE.test(l.text)) { continue; } // chapter author lines
     if (level) {
       // Merge a heading that wraps onto two lines.
       let title = l.text;
@@ -219,6 +257,7 @@ async function processPage(page, pn, state) {
       setHeading(state, level, title, pn, false);
       continue;
     }
+    if (state.inReferences) continue;
     addLine(state, l, body[i - 1], pn);
   }
   if (regions.length && !state.dryRun) await cropRegions(page, pn, regions, state);
@@ -263,14 +302,15 @@ function buildLines(items, W, twoCol, body) {
       if (gap > line.size * 2.2) line.gaps++;
       line.text += (gap > it.size * 0.15 && !line.text.endsWith(' ') && !it.str.startsWith(' ') ? ' ' : '') + it.str;
       line.xEnd = Math.max(line.xEnd, it.x + it.w);
-      line.size = Math.max(line.size, it.size);
+      line.sizes.set(Math.round(it.size * 2) / 2, (line.sizes.get(Math.round(it.size * 2) / 2) || 0) + it.str.length);
       line.bold = line.bold && it.bold;
       line.n++;
     } else {
-      lines.push({ text: it.str, x: it.x, xEnd: it.x + it.w, y: it.y, size: it.size, bold: it.bold, col: c, gaps: 0, n: 1 });
+      lines.push({ text: it.str, x: it.x, xEnd: it.x + it.w, y: it.y, size: it.size, bold: it.bold, col: c, gaps: 0, n: 1, sizes: new Map([[Math.round(it.size * 2) / 2, it.str.length]]) });
     }
   }
   for (const l of lines) {
+    l.size = [...l.sizes.entries()].sort((a, b) => b[1] - a[1])[0][0];
     l.text = l.text.replace(/\s+/g, ' ').trim();
     const m = l.text.match(CAPTION_RE);
     const after = m ? l.text.slice(m[0].length) : '';
@@ -295,7 +335,7 @@ function matchesAnyLine(title, lines) { const t = norm(title); return t.length >
 
 function headingLevel(l, next, body) {
   const words = wordCount(l.text);
-  if (words > 18 || l.caption || /[,;]$/.test(l.text)) return 0;
+  if (words > 18 || l.caption || l.gaps > 0 || /[,;]$/.test(l.text) || /^[a-z]/.test(l.text)) return 0;
   if (!/[A-Za-z]{3}/.test(l.text)) return 0;
   const r = l.size / body;
   if (r >= 1.6) return 1;
@@ -313,6 +353,8 @@ function setHeading(state, level, title, pn, fromOutline) {
   state.headingCount++;
   if (level === 1) { state.chapter = title; state.section = null; }
   else state.section = title;
+  // Reference lists ("Further reading", "References") are not indexed.
+  state.inReferences = level > 1 && REFERENCES_RE.test(title.replace(/^[■•▪\s]+/, ''));
   state.sectionKey = `${state.book.id}:p${pn}h${state.headingCount}`;
   state.sections.push({ book_id: state.book.id, level, title, page_start: pn, ord: pn * 1000 + state.headingCount });
 }
@@ -361,17 +403,35 @@ function flushPara(state, force) {
 
 function addParagraph(state, text, page, pageEnd) {
   const words = wordCount(text);
-  // Very long paragraphs are split at sentence boundaries so each chunk stays embeddable.
+  // Very long paragraphs are split so each chunk stays embeddable: at sentence ends where
+  // possible, otherwise (lists, tables, text without punctuation) every MAX_CHUNK_WORDS words.
   if (words > MAX_CHUNK_WORDS * 1.4) {
-    const sentences = text.match(/[^.!?]+[.!?]+["”)]?\s*|[^.!?]+$/g) || [text];
-    let buf = '';
-    for (const s of sentences) {
-      if (wordCount(buf + s) > MAX_CHUNK_WORDS && buf) { addParagraph(state, buf.trim(), page, pageEnd); flushChunk(state); buf = ''; }
-      buf += s;
-    }
-    if (buf.trim()) addParagraph(state, buf.trim(), page, pageEnd);
+    for (const piece of splitLong(text)) { appendToChunk(state, piece, wordCount(piece), page, pageEnd); flushChunk(state); }
     return;
   }
+  appendToChunk(state, text, words, page, pageEnd);
+}
+
+function splitLong(text) {
+  const sentences = text.match(/[^.!?]+[.!?]+["”)]?\s*|[^.!?]+$/g) || [text];
+  const pieces = [];
+  let buf = '';
+  const push = () => { if (buf.trim()) pieces.push(buf.trim()); buf = ''; };
+  for (const s of sentences) {
+    if (wordCount(s) > MAX_CHUNK_WORDS) {
+      push();
+      const w = s.trim().split(/\s+/);
+      for (let i = 0; i < w.length; i += MAX_CHUNK_WORDS) pieces.push(w.slice(i, i + MAX_CHUNK_WORDS).join(' '));
+      continue;
+    }
+    if (buf && wordCount(buf + s) > MAX_CHUNK_WORDS) push();
+    buf += s;
+  }
+  push();
+  return pieces;
+}
+
+function appendToChunk(state, text, words, page, pageEnd) {
   let c = state.chunk;
   if (c && c.word_count + words > MAX_CHUNK_WORDS) { flushChunk(state); c = null; }
   if (!c) {
@@ -554,3 +614,6 @@ export async function debugWalk(data, body = 10) {
   flushPara(state, true); flushChunk(state);
   return { outline: state.outline, sections: state.sections.map((s) => `${s.level}:${s.title}@${s.page_start}`), chunks: state.ready };
 }
+
+// Dev-only access to the stages, for diagnosing a specific book.
+export const _stages = { flattenOutline, analyseFonts, processPage, pdfjs };

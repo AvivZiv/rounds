@@ -1,7 +1,9 @@
 import { WORDS_PER_MINUTE, SECONDS_PER_FIGURE } from '../config.js';
 
 const STOP = new Set(('a an and are as at be by for from has have how in into is it its of on or that the this to was were what when where which why with ' +
-  'learn learning about vs versus basic basics review understand').split(' '));
+  'learn learning about vs versus basic basics review understand ' +
+  // generic medical words that appear on almost every page and would drown out the real topic
+  'disease diseases syndrome syndromes disorder disorders patient patients condition conditions approach clinical').split(' '));
 
 export function tokenize(s) {
   return (s || '').toLowerCase().normalize('NFKD').replace(/[^\p{L}\p{N}\s-]/gu, ' ')

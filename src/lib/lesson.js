@@ -13,7 +13,7 @@ import { db } from '../db/index.js';
 import { embedQuery, embedQueries, embedPassages } from './embed.js';
 import { cosine, keywordScore, tokenize, wordCount, readingMinutes, sentenceSpans } from './text.js';
 
-export const LESSON_VERSION = 4;
+export const LESSON_VERSION = 5;
 
 const ROLES = [
   { id: 'overview', title: 'What it is', basic: true, kw: /\b(introduction|overview|definition|general|background|approach to)\b/i, q: (t) => `${t}: definition and overview` },
@@ -30,8 +30,8 @@ const ROLES = [
 // margin: how far below the best passage (per subtopic) a passage may score and still be included.
 // extraMargin: in basic depth, "deep" roles (pathophysiology, differentials...) stay only within this margin.
 const DEPTH = {
-  basic: { margin: 0.12, extraMargin: 0.04, gate: 0.22, sections: 8, figures: 4 },
-  expanded: { margin: 0.20, extraMargin: 1, gate: 0.30, sections: 16, figures: 10 },
+  basic: { margin: 0.10, extraMargin: 0.04, gate: 0.22, sections: 5, figures: 4 },
+  expanded: { margin: 0.18, extraMargin: 1, gate: 0.30, sections: 12, figures: 10 },
 };
 
 // Coverage threshold on the relevance score (bge-small cosine + keyword bonus).

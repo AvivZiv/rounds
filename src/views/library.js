@@ -58,9 +58,12 @@ export function renderLibrary(root) {
       status = `<div class="progress"><span style="width:${pct}%"></span></div><span class="small muted">${esc(label)}</span>
         <button class="btn small ghost" data-act="cancel" data-id="${b.id}">Pause</button>`;
     } else if (b.status === 'ready') status = `<span class="small muted">${b.page_count} pages · indexed</span>`;
-    else if (b.status === 'error') status = `<span class="small error">${esc(b.error || 'Error')}</span>`;
-    else status = `<span class="small muted">Paused at page ${b.processed_pages} of ${b.page_count || '?'}</span>
-      ${b.file_path ? `<button class="btn small" data-act="resume" data-id="${b.id}">Resume</button>` : '<span class="small muted">Re-upload the file to continue.</span>'}`;
+    else {
+      const where = `${b.status === 'error' ? `<span class="small error">${esc(b.error || 'Error')}</span> · ` : ''}<span class="small muted">stopped at page ${b.processed_pages} of ${b.page_count || '?'}</span>`;
+      status = where + (b.file_path
+        ? ` <button class="btn small" data-act="resume" data-id="${b.id}">Continue</button>`
+        : ` <label class="btn small">Choose the PDF to continue<input type="file" accept="application/pdf" hidden data-reupload="${b.id}"></label>`);
+    }
     return `<li class="book" data-id="${b.id}">
       <div class="book-icon">${icon('book')}</div>
       <div class="grow">
@@ -93,6 +96,13 @@ export function renderLibrary(root) {
     e.target.value = '';
   });
   root.querySelector('.books').addEventListener('change', async (e) => {
+    if (e.target.dataset.reupload) {
+      // Large PDFs are not stored; picking the file again continues from the last indexed page.
+      const book = store.book(e.target.dataset.reupload);
+      const file = e.target.files[0];
+      if (book && file) enqueue(await db.updateBook(book.id, { status: 'processing', error: null }), file);
+      return;
+    }
     if (!e.target.matches('.book-title')) return;
     const title = e.target.value.trim();
     if (title) { await db.updateBook(e.target.dataset.id, { title }); await store.refreshBooks(); }

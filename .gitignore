@@ -5,3 +5,4 @@ dist/
 samples/_tmp/
 *.pdf
 !samples/sample-*.pdf
+local-test/
