@@ -52,18 +52,38 @@ export const supabase = {
   async getBook(id) { return check(await sb.from('books').select('*').eq('id', id).maybeSingle()); },
   async createBook(row) { return check(await sb.from('books').insert(row).select().single()); },
   async updateBook(id, patch) { return check(await sb.from('books').update(patch).eq('id', id).select().single()); },
-  async deleteBook(id) {
+  // A big textbook has tens of thousands of rows and thousands of figure files. Deleting them
+  // in one request exceeds Supabase's per-request time limit, so everything goes in small steps.
+  async deleteBook(id, onProgress = () => {}) {
+    await this.clearBookIndex(id, (f) => onProgress(f * 0.8));
     const uid = await uidPrefix();
-    // Remove stored files first (figures folder + pdf), then rows cascade.
-    const { data: files } = await sb.storage.from('figures').list(`${uid}/${id}`, { limit: 10000 });
-    if (files?.length) await sb.storage.from('figures').remove(files.map((f) => `${uid}/${id}/${f.name}`));
+    const folder = `${uid}/${id}`;
+    for (;;) {
+      const { data: files, error } = await sb.storage.from('figures').list(folder, { limit: 500 });
+      if (error) throw new Error(error.message);
+      if (!files?.length) break;
+      check(await sb.storage.from('figures').remove(files.map((f) => `${folder}/${f.name}`)));
+      onProgress(0.9);
+    }
     await sb.storage.from('books').remove([`${uid}/${id}.pdf`]);
     check(await sb.from('books').delete().eq('id', id));
+    onProgress(1);
   },
-  async clearBookIndex(id) {
+  async clearBookIndex(id, onProgress = () => {}) {
+    const book = check(await sb.from('books').select('page_count').eq('id', id).maybeSingle());
+    const pages = Math.max(book?.page_count || 0, 1);
+    const STEP = 50; // pages per request (~350 passages)
+    for (let p = 0; p <= pages + STEP; p += STEP) {
+      // ord = page * 1000 + n for chunks and sections; figures use page directly
+      check(await sb.from('chunks').delete().eq('book_id', id).gte('ord', p * 1000).lt('ord', (p + STEP) * 1000));
+      check(await sb.from('book_sections').delete().eq('book_id', id).gte('ord', p * 1000).lt('ord', (p + STEP) * 1000));
+      check(await sb.from('figures').delete().eq('book_id', id).gte('page', p).lt('page', p + STEP));
+      onProgress(Math.min(1, (p + STEP) / pages));
+    }
+    // anything left outside the expected ranges
     check(await sb.from('chunks').delete().eq('book_id', id));
-    check(await sb.from('figures').delete().eq('book_id', id));
     check(await sb.from('book_sections').delete().eq('book_id', id));
+    check(await sb.from('figures').delete().eq('book_id', id));
   },
   async uploadBookFile(bookId, file) {
     const path = `${await uidPrefix()}/${bookId}.pdf`;

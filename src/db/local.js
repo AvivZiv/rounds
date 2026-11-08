@@ -93,7 +93,7 @@ export const local = {
   async getBook(id) { return get('books', id); },
   async createBook(row) { return put('books', withMeta({ status: 'pending', processed_pages: 0, ...row })); },
   async updateBook(id, patch) { return put('books', { ...(await get('books', id)), ...patch }); },
-  async deleteBook(id) {
+  async deleteBook(id, onProgress = () => {}) {
     const book = await get('books', id);
     for (const f of await byIndex('figures', 'book_id', id)) await del('files', f.image_path);
     if (book?.file_path) await del('files', book.file_path);
@@ -101,7 +101,8 @@ export const local = {
     await delByIndex('figures', 'book_id', id);
     await delByIndex('book_sections', 'book_id', id);
     chunkCache = null;
-    return del('books', id);
+    await del('books', id);
+    onProgress(1);
   },
   async clearBookIndex(id) {
     await delByIndex('chunks', 'book_id', id); await delByIndex('figures', 'book_id', id); await delByIndex('book_sections', 'book_id', id);

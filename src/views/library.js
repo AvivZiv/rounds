@@ -6,6 +6,7 @@ import { cleanTitle } from '../lib/lesson.js';
 
 // Ingestion jobs live outside the view so they survive navigation.
 const jobs = new Map(); // bookId -> {phase, page, pages, msg, ctrl}
+const deleting = new Map(); // bookId -> fraction done
 const jobQueue = [];
 let jobRunning = false;
 let modelMsg = '';
@@ -54,7 +55,9 @@ export function renderLibrary(root) {
     const job = jobs.get(b.id);
     const pct = b.page_count ? Math.round(((job?.page ?? b.processed_pages) / b.page_count) * 100) : 0;
     let status;
-    if (job) {
+    if (deleting.has(b.id)) {
+      status = `<div class="progress"><span style="width:${Math.round(deleting.get(b.id) * 100)}%"></span></div><span class="small muted">Deleting…</span>`;
+    } else if (job) {
       const label = { queued: 'Waiting…', upload: 'Uploading to private storage…', download: 'Fetching stored PDF…', analyse: 'Reading the layout…', pages: `Page ${job.page} of ${job.pages}`, embed: `Indexing ${job.msg || ''}` }[job.phase] || '…';
       status = `<div class="progress"><span style="width:${pct}%"></span></div><span class="small muted">${esc(label)}</span>
         <button class="btn small ghost" data-act="cancel" data-id="${b.id}">Pause</button>`;
@@ -72,7 +75,7 @@ export function renderLibrary(root) {
         <div class="book-status">${status}</div>
       </div>
       <details class="menu"><summary aria-label="Book options">${icon('more')}</summary><div class="menu-pop">
-        ${b.file_path && !job ? `<button data-act="reindex" data-id="${b.id}">Re-index</button>` : ''}
+        ${b.file_path && !job && !deleting.has(b.id) ? `<button data-act="reindex" data-id="${b.id}">Re-index</button>` : ''}
         <button data-act="delete" data-id="${b.id}" class="danger">Delete</button></div></details>
     </li>`;
   };
@@ -119,10 +122,19 @@ export function renderLibrary(root) {
       await db.clearBookIndex(book.id);
       enqueue(await db.updateBook(book.id, { processed_pages: 0, status: 'pending' }), null);
     } else if (b.dataset.act === 'delete') {
+      if (deleting.has(book.id)) return;
       if (!(await confirmDialog(`Delete “${book.title}” and its index? Lessons built from it will no longer include it.`))) return;
       jobs.get(book.id)?.ctrl.abort();
-      await db.deleteBook(book.id);
-      await store.refreshBooks();
+      deleting.set(book.id, 0); store.emit();
+      try {
+        await db.deleteBook(book.id, (f) => { deleting.set(book.id, f); store.emit(); });
+        toast(`Deleted “${book.title}”`);
+      } catch (err) {
+        toast(`Could not finish deleting: ${err.message}. Try again.`, 6000);
+      } finally {
+        deleting.delete(book.id);
+        await store.refreshBooks();
+      }
     }
   });
 }
