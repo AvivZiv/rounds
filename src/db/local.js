@@ -2,22 +2,25 @@
 import { cosine, keywordScore, tokenize } from '../lib/text.js';
 
 const DB_NAME = 'rounds-local';
-const STORES = ['lists', 'items', 'books', 'book_sections', 'chunks', 'figures', 'lessons', 'highlights', 'settings', 'files'];
+const STORES = ['lists', 'items', 'books', 'book_sections', 'chunks', 'figures', 'lessons', 'highlights', 'settings', 'files', 'tree_nodes', 'node_marks'];
 const LOCAL_USER = 'local-user';
 
 let dbp;
 function open() {
   if (dbp) return dbp;
   dbp = new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, 1);
+    const req = indexedDB.open(DB_NAME, 2);
     req.onupgradeneeded = () => {
       const db = req.result;
       for (const s of STORES) {
+        if (db.objectStoreNames.contains(s)) continue;
         const os = db.createObjectStore(s, { keyPath: s === 'settings' ? 'user_id' : (s === 'files' ? 'path' : 'id') });
         if (['book_sections', 'chunks', 'figures'].includes(s)) os.createIndex('book_id', 'book_id');
         if (s === 'chunks') os.createIndex('section_key', 'section_key');
         if (s === 'highlights') os.createIndex('lesson_id', 'lesson_id');
         if (s === 'lessons') os.createIndex('item_id', 'item_id');
+        if (s === 'tree_nodes') { os.createIndex('item_id', 'item_id'); os.createIndex('parent_id', 'parent_id'); }
+        if (s === 'node_marks') os.createIndex('node_id', 'node_id');
       }
     };
     req.onsuccess = () => resolve(req.result);
@@ -168,4 +171,49 @@ export const local = {
 
   // ---- optional generated connecting note (needs the Supabase edge function)
   async connectNote() { return null; },
+
+  // ---- knowledge tree. In local mode generation runs through the Vite dev hook (/__tree),
+  // which calls Claude Code on this machine; there is no queue.
+  async listNodes(itemId) { return (await byIndex('tree_nodes', 'item_id', itemId)).sort((a, b) => a.depth - b.depth || a.ord - b.ord); },
+  async requestTree(itemId, nodeId = null) {
+    const item = await get('items', itemId);
+    const settings = await this.getSettings();
+    const level = [settings.career_interest, settings.emphasis?.length ? 'emphasise ' + settings.emphasis.join(', ') : ''].filter(Boolean).join('; ');
+    const all = await this.listNodes(itemId);
+    let ctx = null, node = null;
+    if (nodeId) {
+      node = all.find((n) => n.id === nodeId);
+      if (!node || node.children === 'ready') return;
+      await put('tree_nodes', { ...node, children: 'pending' });
+      const byId = new Map(all.map((n) => [n.id, n]));
+      const ancestors = [];
+      for (let p_ = byId.get(node.parent_id); p_; p_ = byId.get(p_.parent_id)) ancestors.unshift({ label: p_.label, text: p_.text });
+      ctx = { node: { label: node.label, text: node.text, depth: node.depth }, ancestors, siblings: all.filter((n) => n.parent_id === node.parent_id && n.id !== node.id).map((n) => ({ label: n.label })) };
+    } else if (all.some((n) => !n.parent_id)) return;
+    try {
+      const res = await fetch('/__tree', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ item: { topic: item.title, note: item.note, level }, ctx }) });
+      const g = await res.json();
+      if (!res.ok) throw new Error(g.error || res.statusText);
+      let parentId = nodeId, depth = node ? node.depth + 1 : 1;
+      if (!nodeId) {
+        const rootRow = withMeta({ item_id: itemId, parent_id: null, depth: 0, ord: 0, label: item.title, text: g.root.summary, expandable: true, children: 'ready', topic_type: g.root.topic_type, model: g.model });
+        await put('tree_nodes', rootRow); parentId = rootRow.id;
+      }
+      await putMany('tree_nodes', g.nodes.map((n) => withMeta({ item_id: itemId, parent_id: parentId, depth, ...n, children: 'none', model: g.model })));
+      if (node) await put('tree_nodes', { ...node, children: 'ready' });
+    } catch (e) {
+      if (node) await put('tree_nodes', { ...node, children: 'none' });
+      throw e;
+    }
+  },
+  /** Local mode has no background generator: results arrive when requestTree resolves. */
+  subscribeTree(itemId, onChange) { return () => {}; },
+  async pendingRequest() { return null; },
+  async listMarks(itemId) { const ids = new Set((await byIndex('tree_nodes', 'item_id', itemId)).map((n) => n.id)); return (await all('node_marks')).filter((m) => ids.has(m.node_id)); },
+  async setMark(nodeId, style) {
+    const existing = (await byIndex('node_marks', 'node_id', nodeId))[0];
+    if (!style) { if (existing) await del('node_marks', existing.id); return null; }
+    return put('node_marks', { ...(existing || withMeta({})), node_id: nodeId, style });
+  },
+  async clearTree(itemId) { await delByIndex('tree_nodes', 'item_id', itemId); },
 };

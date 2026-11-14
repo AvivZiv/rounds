@@ -48,7 +48,7 @@ export function estimateHTML(item) {
   if (item.coverage === 'none') return `<span class="muted small">Not covered in your books</span>`;
   if (!store.books.some((b) => b.status === 'ready')) return '';
   const b = item.est_basic_min, x = item.est_expanded_min;
-  if (b == null && x == null) return `<span class="muted small">estimating…</span>`;
+  if (b == null && x == null) return '';
   return `<span class="est small">${icon('clock')} ${formatMinutes(b)} <span class="muted">· expanded ${formatMinutes(x)}</span></span>`;
 }
 

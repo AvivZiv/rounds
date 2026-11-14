@@ -1,6 +1,16 @@
-# Rounds — Study Companion (v1)
+# Rounds — Study Companion (v2)
 
-Capture what comes up on rounds in a few seconds, then read it as a lesson built from **original passages of your own textbooks**.
+Capture what comes up on rounds in a few seconds, then learn it as a **knowledge tree**: short paragraphs (1–2 sentences each) covering the whole scope of the topic in clinical order, each one opening into its own short paragraphs, as deep as you need. Your own textbooks are one tap away from any node ("In your books").
+
+## v2: the knowledge tree
+
+- **Nodes are written by Claude**, through your Claude subscription (Claude Code headless), not an API key. Content is generated, not quoted; verify doses and cut-offs against the book node ("In your books" shows the matching textbook passage with page).
+- **How it runs:** the phone/web app writes a request to Supabase; a small **generator on your laptop** (`npm run generator`, or installed at login with `npm run generator:install`) picks it up, runs `claude -p`, and writes the nodes back. Roots are pre-built two levels deep for every open item, so most taps are instant; deeper dives wait for the laptop if it is asleep. Config lives in `.env.local` (copy of `.env.example` plus `OWNER_PASSWORD`); it never leaves the laptop.
+- **Database:** run `supabase/migrations/002_tree.sql` after `001_init.sql`.
+- **Model:** `claude-sonnet-5-5` by default (same node quality as Opus in testing, three times faster); set `ROUNDS_MODEL` in `.env.local` to change it.
+- In local mode (no Supabase) the dev server builds trees itself via `/__tree`.
+- The verbatim lesson builder from v1 is still there ("From your books" on an item) but no longer runs in the background.
+
 
 - **Quick capture** — one field; Advanced (list, deadline, depth, preferred book, note) is collapsed.
 - **Lists & Today** — your own lists, drag to prioritise, deadlines; *Today* collects overdue, due-in-3-days and review-today items from every list.

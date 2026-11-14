@@ -1,4 +1,4 @@
-import { store, getLesson, queueEstimate } from '../store.js';
+import { store, getLesson } from '../store.js';
 import { esc, icon, $, toast, confirmDialog, todayISO, addDays, dueLabel } from '../ui.js';
 import { formatMinutes } from '../lib/text.js';
 
@@ -7,15 +7,9 @@ export function renderItem(root, id) {
   if (!item) { root.innerHTML = '<p class="empty">Item not found.</p>'; return; }
   const list = store.list(item.list_id);
   const hasBooks = store.books.some((b) => b.status === 'ready');
-  if (hasBooks && item.status === 'open' && item.coverage !== 'none' && (item.est_basic_min == null || item.est_expanded_min == null)) {
-    queueEstimate(item.id, { front: true }); // opened item is estimated first
-  }
+
   const opt = (v, cur, label) => `<option value="${esc(v)}" ${v === (cur ?? '') ? 'selected' : ''}>${esc(label)}</option>`;
-  const readBtn = (depth, mins) => `
-    <a class="read-btn ${item.depth === depth ? 'preferred' : ''}" href="#/read/${item.id}/${depth}">
-      <span class="read-depth">${depth === 'basic' ? 'Basic' : 'Expanded'}</span>
-      <span class="read-time">${mins == null ? (item.coverage === 'none' ? '—' : 'estimating…') : formatMinutes(mins)}</span>
-    </a>`;
+  const readBtn = (depth, mins) => `<a class="btn small ghost" href="#/read/${item.id}/${depth}">${depth === 'basic' ? 'Basic' : 'Expanded'} passages${mins != null ? ' · ' + formatMinutes(mins) : ''}</a>`;
 
   root.innerHTML = `
     <header class="page-head row">
@@ -26,11 +20,12 @@ export function renderItem(root, id) {
       <textarea name="title" class="title-edit" rows="2" aria-label="Title">${esc(item.title)}</textarea>
       ${item.status === 'done' ? `<p class="done-banner">${icon('check')} Done${item.done_at ? ' on ' + new Date(item.done_at).toLocaleDateString() : ''}${item.review_date ? ` · review ${esc(dueLabel(item.review_date))}` : ''}</p>` : ''}
       <div class="read-row">
-        ${hasBooks ? (item.coverage === 'none'
-          ? `<p class="not-covered">None of your books covers this topic.</p>`
-          : readBtn('basic', item.est_basic_min) + readBtn('expanded', item.est_expanded_min))
-          : `<p class="hint">Upload textbooks in <a href="#/library">Library</a> to read a lesson on this.</p>`}
+        <a class="read-btn preferred grow" href="#/tree/${item.id}">
+          <span class="read-depth">${icon('list')} Open</span>
+          <span class="read-time">Short paragraphs, go as deep as you need</span>
+        </a>
       </div>
+      ${hasBooks ? `<div class="row wrap small-row"><span class="muted small">From your books:</span>${item.coverage === 'none' ? '<span class="muted small">not covered</span>' : readBtn('basic', item.est_basic_min) + readBtn('expanded', item.est_expanded_min)}</div>` : ''}
       <div class="fields">
         <label>List<select name="list_id">${store.lists.map((l) => opt(l.id, item.list_id, l.name)).join('')}</select></label>
         <label>Deadline<input type="date" name="deadline" value="${esc(item.deadline || '')}"></label>

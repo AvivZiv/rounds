@@ -23,7 +23,6 @@ export const store = {
   async addItem(row) {
     const item = await db.createItem({ list_id: this.defaultList()?.id, ...row });
     this.items.push(item); this.emit();
-    queueEstimate(item.id, { front: true });
     return item;
   },
   async updateItem(id, patch) {
@@ -31,7 +30,7 @@ export const store = {
     const item = await db.updateItem(id, patch);
     this.items = this.items.map((i) => (i.id === id ? item : i)); this.emit();
     if (before && (patch.title && patch.title !== before.title || 'preferred_book_id' in patch && patch.preferred_book_id !== before.preferred_book_id)) {
-      await invalidate(id); queueEstimate(id, { front: true });
+      await invalidate(id);
     }
     return item;
   },
@@ -81,6 +80,8 @@ export function queueEstimate(id, { front = false } = {}) {
   pump();
 }
 export function queueMissingEstimates() {
+  return; // lessons from the books are built on demand only; the knowledge tree is the main view
+  // eslint-disable-next-line no-unreachable
   if (!store.books.some((b) => b.status === 'ready')) return;
   for (const i of store.items) if (i.status === 'open' && (i.est_basic_min == null || i.est_expanded_min == null) && i.coverage !== 'none') queueEstimate(i.id);
 }

@@ -363,3 +363,53 @@ body.lb-open { overflow: hidden; }
 .lsec-end { display: none; }
 .outline .num { background: none; color: var(--accent); border: 1.5px solid currentColor; }
 .supp .lsec-title { color: var(--ink); }
+
+/* ============================================================ KNOWLEDGE TREE */
+.tree { min-height: 100vh; }
+.tree-bar { position: sticky; top: 0; z-index: 25; display: flex; align-items: center; gap: 6px; padding: 6px 10px; padding-top: calc(6px + env(safe-area-inset-top)); background: color-mix(in srgb, var(--paper) 94%, transparent); backdrop-filter: blur(8px); border-bottom: 1px solid var(--line); }
+.tree-bar .bar-title { flex: 1; min-width: 0; font: 500 14px var(--sans); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tree-body { max-width: 40em; margin: 0 auto; padding: 14px 18px 80px; }
+.crumbs { font: 13px var(--sans); color: var(--muted); display: flex; flex-wrap: wrap; gap: 4px 6px; margin: 4px 0 14px; }
+.crumbs .crumb { color: var(--accent); text-decoration: none; }
+.crumbs .crumb.on { color: var(--muted); }
+.crumbs .sep { color: var(--line); }
+.focus { margin-bottom: 22px; padding-bottom: 16px; border-bottom: 1px solid var(--line); }
+.focus h1 { font: 600 26px/1.2 var(--serif); margin: 0 0 8px; }
+.focus .kicker { margin-bottom: 4px; }
+.focus-text { font: 18px/1.55 var(--serif); margin: 0 0 12px; color: var(--ink); }
+.focus.highlight .focus-text { background: var(--hl); box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+.focus-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.feed { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.node { display: flex; align-items: stretch; border-radius: 12px; }
+.node:hover { background: var(--card); }
+.node-main { flex: 1; min-width: 0; display: grid; gap: 3px; padding: 13px 4px 13px 12px; text-decoration: none; color: var(--ink); border-left: 3px solid transparent; }
+.node.can .node-main { border-left-color: var(--accent); }
+.node.leaf .node-main { border-left-color: var(--line); }
+.node.highlight .node-text { background: var(--hl); box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+.node-label { font: 600 13px var(--sans); text-transform: uppercase; letter-spacing: .05em; color: var(--accent); }
+.node.leaf .node-label { color: var(--ink-2); }
+.node-text { font: 17px/1.5 var(--serif); }
+.node-meta { font: 12px var(--sans); color: var(--muted); }
+.node-more { border: 0; background: none; color: var(--muted); padding: 0 10px; cursor: pointer; border-radius: 10px; }
+.leaf-end { color: var(--muted); font: 14px var(--sans); padding: 16px 0; }
+.tree .hint { margin-top: 20px; }
+
+/* bottom sheet */
+.sheet { position: fixed; inset: 0; z-index: 80; background: rgba(0,0,0,.35); display: flex; align-items: flex-end; justify-content: center; }
+.sheet[hidden] { display: none; }
+.sheet-inner { position: relative; width: 100%; max-width: 640px; max-height: 60vh; overflow: auto; background: var(--paper); border-radius: 18px 18px 0 0; padding: 18px 20px calc(20px + env(safe-area-inset-bottom)); box-shadow: 0 -8px 30px rgba(0,0,0,.2); }
+.sheet.tall .sheet-inner { max-height: 88vh; }
+.sheet h3 { font: 600 20px var(--serif); margin: 4px 0 6px; }
+.sheet-close { position: absolute; top: 10px; right: 12px; width: 34px; height: 34px; border: 0; border-radius: 50%; background: var(--paper-2); font-size: 22px; line-height: 1; cursor: pointer; color: var(--ink); }
+.sheet-actions { display: grid; gap: 8px; margin-top: 14px; }
+.map, .map ul { list-style: none; margin: 0; padding: 0 0 0 14px; }
+.map > li { padding-left: 0; }
+.map li { margin: 2px 0; }
+.map a { display: block; padding: 7px 8px; border-radius: 8px; text-decoration: none; color: var(--ink); font: 15px var(--sans); border-left: 2px solid var(--line); }
+.map a.on { background: var(--card); border-left-color: var(--accent); font-weight: 600; }
+.book-hit { margin: 16px 0; font-family: var(--serif); font-size: 16px; line-height: 1.55; }
+.book-hit p { margin: 6px 0; }
+.book-hit .source { margin: 0 0 4px; border: 0; padding: 0; }
+@media (min-width: 900px) { .sheet { align-items: center; } .sheet-inner { border-radius: 18px; } }
+.small-row { flex-wrap: wrap; gap: 6px; margin: 4px 0 14px; }
+.read-btn.grow { flex: 1; }

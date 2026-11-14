@@ -154,6 +154,41 @@ export const supabase = {
     return check(await sb.from('settings').upsert({ ...rest, updated_at: now() }).select().single());
   },
 
+  // ---- knowledge tree: nodes are written by the laptop generator; the app only queues requests.
+  async listNodes(itemId) { return check(await sb.from('tree_nodes').select('*').eq('item_id', itemId).order('depth').order('ord')); },
+  async requestTree(itemId, nodeId = null) {
+    // One open request per target is enough.
+    let q = sb.from('tree_requests').select('id').eq('item_id', itemId).in('status', ['pending', 'running']);
+    q = nodeId ? q.eq('node_id', nodeId) : q.is('node_id', null);
+    if ((await q).data?.length) return;
+    if (nodeId) await sb.from('tree_nodes').update({ children: 'pending' }).eq('id', nodeId).eq('children', 'none');
+    check(await sb.from('tree_requests').insert({ item_id: itemId, node_id: nodeId }));
+  },
+  /** Calls onChange whenever nodes or requests for this item change (realtime), plus a slow poll as a fallback. */
+  subscribeTree(itemId, onChange) {
+    const ch = sb.channel(`tree-${itemId}-${Math.random().toString(36).slice(2)}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tree_nodes', filter: `item_id=eq.${itemId}` }, onChange)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'tree_requests', filter: `item_id=eq.${itemId}` }, onChange)
+      .subscribe();
+    const t = setInterval(onChange, 8000);
+    return () => { clearInterval(t); sb.removeChannel(ch); };
+  },
+  async pendingRequest(itemId, nodeId = null) {
+    let q = sb.from('tree_requests').select('*').eq('item_id', itemId).order('created_at', { ascending: false }).limit(1);
+    q = nodeId ? q.eq('node_id', nodeId) : q.is('node_id', null);
+    return (await q).data?.[0] || null;
+  },
+  async listMarks(itemId) {
+    const nodes = check(await sb.from('tree_nodes').select('id').eq('item_id', itemId));
+    if (!nodes.length) return [];
+    return check(await sb.from('node_marks').select('*').in('node_id', nodes.map((n) => n.id)));
+  },
+  async setMark(nodeId, style) {
+    if (!style) { check(await sb.from('node_marks').delete().eq('node_id', nodeId)); return null; }
+    return check(await sb.from('node_marks').upsert({ node_id: nodeId, style }, { onConflict: 'node_id' }).select().single());
+  },
+  async clearTree(itemId) { check(await sb.from('tree_nodes').delete().eq('item_id', itemId)); },
+
   // ---- optional generated connecting note via Edge Function (returns null if not deployed/configured)
   // Optional: stops trying for this session once the function turns out not to be deployed or configured.
   async connectNote(payload) {

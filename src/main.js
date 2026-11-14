@@ -9,6 +9,7 @@ import { renderItem } from './views/item.js';
 import { renderLibrary } from './views/library.js';
 import { renderSettings } from './views/settings.js';
 import { renderReader, leaveReader } from './views/reader.js';
+import { renderTree, leaveTree } from './views/tree.js';
 
 const app = document.getElementById('app');
 
@@ -58,7 +59,7 @@ async function start() {
 // Re-render on data changes, but never while the user is typing or dragging.
 let dirty = false;
 function scheduleRender() {
-  if (currentRoute().name === 'read') return; // the reader manages itself
+  if (['read', 'tree'].includes(currentRoute().name)) return; // reader and tree manage themselves
   const a = document.activeElement;
   if (a && a.closest?.('#view') && a.matches('input, textarea, select') || document.querySelector('.dragging')) {
     dirty = true; return;
@@ -80,6 +81,7 @@ function route(navigated) {
   if (!view) return;
   const { name, args } = currentRoute();
   if (lastName === 'read' && name !== 'read') leaveReader();
+  if (lastName === 'tree' && name !== 'tree') leaveTree();
   // Preserve scroll position on data-driven re-renders.
   const y = scrollY;
   const openDetails = [...view.querySelectorAll('details[open]')].map((d) => d.className);
@@ -91,6 +93,7 @@ function route(navigated) {
     case 'library': renderLibrary(view); break;
     case 'settings': renderSettings(view); break;
     case 'read': if (navigated || lastName !== 'read') renderReader(view, args[0], args[1] || 'basic'); break;
+    case 'tree': if (navigated) renderTree(view, args[0], args[1] || null); break;
     default: location.hash = '#/today'; return;
   }
   if (!navigated) {
@@ -98,7 +101,7 @@ function route(navigated) {
     openDetails.forEach((c) => view.querySelector(`details.${c.split(' ').join('.')}`)?.setAttribute('open', ''));
   } else if (name !== 'read') scrollTo(0, 0);
   lastName = name;
-  const tab = { list: 'lists', item: 'lists' }[name] || name;
+  const tab = { list: 'lists', item: 'lists', tree: 'lists', read: 'lists' }[name] || name;
   document.querySelectorAll('.tabs a').forEach((a) => a.classList.toggle('on', a.dataset.tab === tab));
 }
 

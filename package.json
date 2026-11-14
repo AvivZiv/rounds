@@ -6,7 +6,12 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "generator": "node tools/generator.mjs",
+    "generator:once": "node tools/generator.mjs --once",
+    "generator:install": "sh tools/install-generator.sh",
+    "generator:uninstall": "sh tools/install-generator.sh uninstall",
+    "tree:test": "node tools/tree-test.mjs"
   },
   "dependencies": {
     "@huggingface/transformers": "^3.7.0",
