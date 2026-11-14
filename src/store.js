@@ -35,6 +35,14 @@ export const store = {
     return item;
   },
   async deleteItem(id) { await db.deleteItem(id); this.items = this.items.filter((i) => i.id !== id); this.emit(); },
+  progress: {},
+  progressAt: 0,
+  /** Reading progress per item; refreshed at most every 20 s unless forced. */
+  async loadProgress(force = false) {
+    if (!force && Date.now() - this.progressAt < 20000) return;
+    this.progressAt = Date.now();
+    try { this.progress = (await db.treeProgress?.()) || {}; this.emit(); } catch { /* table may not exist yet */ }
+  },
   async refreshBooks() { this.books = await db.listBooks(); this.emit(); },
   async saveSettings(s) { this.settings = await db.saveSettings({ ...this.settings, ...s }); this.emit(); },
 };

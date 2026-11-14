@@ -52,6 +52,12 @@ export function estimateHTML(item) {
   return `<span class="est small">${icon('clock')} ${formatMinutes(b)} <span class="muted">· expanded ${formatMinutes(x)}</span></span>`;
 }
 
+/** Progress ring: share of an item's tree you have read. */
+export function ringSVG(p, size = 38) {
+  const r = size / 2 - 3, c = 2 * Math.PI * r, f = p?.total ? p.read / p.total : 0;
+  return `<svg class="ring" viewBox="0 0 ${size} ${size}" width="${size}" height="${size}"><circle cx="${size / 2}" cy="${size / 2}" r="${r}" class="ring-bg"/>${f ? `<circle cx="${size / 2}" cy="${size / 2}" r="${r}" class="ring-fg" stroke-dasharray="${(f * c).toFixed(1)} ${c.toFixed(1)}" transform="rotate(-90 ${size / 2} ${size / 2})"/>` : ''}${f >= 0.999 ? `<path class="ring-ok" d="M${size * 0.34} ${size * 0.52}l${size * 0.11} ${size * 0.11} ${size * 0.2}-${size * 0.24}"/>` : ''}</svg>`;
+}
+
 export function itemRowHTML(item, { showList = false, draggable = false } = {}) {
   const list = showList ? store.list(item.list_id) : null;
   let due = '';
@@ -60,12 +66,14 @@ export function itemRowHTML(item, { showList = false, draggable = false } = {}) 
     due = `<span class="chip ${n < 0 ? 'overdue' : n <= 2 ? 'soon' : ''}">${icon('calendar')} ${esc(dueLabel(item.deadline))}</span>`;
   }
   const review = item.review_date && item.status === 'done' ? `<span class="chip review">${icon('repeat')} review ${esc(dueLabel(item.review_date))}</span>` : '';
+  const p = store.progress[item.id];
   return `
   <li class="item ${item.status === 'done' ? 'done' : ''}" data-id="${item.id}">
     ${draggable ? `<span class="handle" aria-label="Drag to reorder" title="Drag to reorder">${icon('grip')}</span>` : ''}
+    <a class="item-ring" href="#/item/${item.id}" aria-hidden="true" tabindex="-1">${ringSVG(p)}</a>
     <a class="item-main" href="#/item/${item.id}">
       <span class="item-title">${esc(item.title)}</span>
-      <span class="item-meta">${list ? `<span class="chip list">${esc(list.name)}</span>` : ''}${due}${review}${item.depth === 'expanded' ? '<span class="chip">expanded</span>' : ''} ${estimateHTML(item)}</span>
+      <span class="item-meta">${p?.total ? `<span class="prog">${p.read ? `${p.read} of ${p.total} read` : 'Not started'}</span>` : ''}${list ? `<span class="chip list">${esc(list.name)}</span>` : ''}${due}${review}</span>
     </a>
   </li>`;
 }

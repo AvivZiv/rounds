@@ -89,22 +89,26 @@ function draw() {
       ? `<span class="crumb on">${esc(c.label)}</span>`
       : `<a class="crumb" href="#/tree/${s.itemId}/${c.id}">${esc(c.label)}</a><span class="sep">›</span>`).join('')}</nav>` : ''}
     <header class="focus ${markOf(focus.id) || ''}">
-      ${focus.depth === 0 ? `<p class="kicker">${esc(focus.topic_type || 'topic')}</p>` : ''}
+      <span class="pill">${esc(focus.depth === 0 ? (focus.topic_type || 'topic') : `Level ${focus.depth}`)}</span>
       <h1>${esc(focus.label)}</h1>
       <p class="focus-text">${esc(focus.text)}</p>
+      ${children.length ? `<div class="pbar"><span style="width:${Math.round(100 * children.filter((c) => c.visited_at).length / children.length)}%"></span></div>
+      <p class="pbar-l">${children.filter((c) => c.visited_at).length} of ${children.length} sections read</p>` : ''}
       <div class="focus-actions">
         <button class="btn small ghost" data-mark="${focus.id}">${icon('marker')} ${markOf(focus.id) ? 'Unmark' : 'Mark'}</button>
         <button class="btn small ghost" data-books="${focus.id}">${icon('book')} In your books</button>
         ${focus.depth > 0 ? `<a class="btn small ghost" href="#/tree/${s.itemId}/${focus.parent_id}">${icon('back')} Up</a>` : ''}
       </div>
     </header>
-    ${children.length ? `<ol class="feed">${children.map((c) => `
-      <li class="node ${markOf(c.id) || ''} ${c.expandable ? 'can' : 'leaf'}" data-id="${c.id}">
+    ${children.length ? `<ol class="feed">${children.map((c, i) => `
+      <li class="node ${markOf(c.id) || ''} ${c.expandable ? 'can' : 'leaf'} ${c.visited_at ? 'read' : ''}" data-id="${c.id}">
+        <span class="num" aria-hidden="true">${c.visited_at ? '✓' : i + 1}</span>
         <a class="node-main" href="#/tree/${s.itemId}/${c.id}">
           <span class="node-label">${esc(c.label)}</span>
           <span class="node-text">${esc(c.text)}</span>
-          <span class="node-meta">${c.children === 'ready' ? `${kids(c.id)} below` : c.children === 'pending' ? 'building…' : c.expandable ? 'tap to go deeper' : ''}</span>
+          <span class="node-meta">${c.children === 'ready' ? `${kids(c.id)} below` : c.children === 'pending' ? 'building…' : c.expandable ? 'go deeper' : ''}</span>
         </a>
+        ${c.expandable ? `<span class="chev" aria-hidden="true">${icon('chev')}</span>` : ''}
         <button class="node-more" data-menu="${c.id}" aria-label="More">${icon('more')}</button>
       </li>`).join('')}</ol>`
       : focus.children === 'pending' || (focus.children === 'none' && focus.expandable) ? waitingHTML(focus.depth === 0 ? 'Building the overview…' : `Going deeper into ${focus.label}…`)

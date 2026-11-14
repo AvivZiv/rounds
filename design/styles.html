@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rounds style options</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Nunito:wght@500;600;700;800&family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 24px; display: flex; gap: 28px; align-items: flex-start; background: #ddd; font-family: sans-serif; }
+  .phone { width: 390px; height: 844px; overflow: hidden; border-radius: 36px; position: relative; flex-shrink: 0; box-shadow: 0 10px 40px rgba(0,0,0,.18); }
+  .status { height: 44px; display: flex; justify-content: space-between; align-items: center; padding: 0 28px; font: 600 15px -apple-system, sans-serif; }
+  .ico { width: 20px; height: 20px; flex-shrink: 0; }
+  svg.ico path, svg.ico circle, svg.ico rect { fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+
+  /* ====================================================== A. WARM NOTEBOOK */
+  .a { background: #fbf6ee; color: #3b2f24; font-family: 'Nunito', sans-serif; }
+  .a .status { color: #3b2f24; }
+  .a .wrap { padding: 4px 22px; }
+  .a .hello { font: 800 30px/1.15 'Nunito'; margin: 8px 0 2px; }
+  .a .sub { color: #8a7563; font-size: 16px; margin: 0 0 18px; }
+  .a .capture { display: flex; align-items: center; gap: 10px; background: #fff; border-radius: 22px; padding: 14px 16px; box-shadow: 0 4px 18px rgba(120,80,40,.10); color: #a8957f; font-size: 16px; }
+  .a .capture .plus { margin-left: auto; width: 38px; height: 38px; border-radius: 14px; background: #e07a52; color: #fff; display: grid; place-items: center; font-size: 22px; }
+  .a h2 { font: 800 13px 'Nunito'; letter-spacing: .08em; text-transform: uppercase; color: #b0896a; margin: 26px 0 10px; }
+  .a .card { background: #fff; border-radius: 20px; padding: 14px 16px; margin-bottom: 10px; box-shadow: 0 2px 10px rgba(120,80,40,.07); display: flex; gap: 12px; align-items: center; }
+  .a .emoji { width: 42px; height: 42px; border-radius: 14px; display: grid; place-items: center; flex-shrink: 0; }
+  .a .card b { display: block; font-size: 16.5px; font-weight: 700; }
+  .a .card small { color: #9a8573; font-size: 13.5px; }
+  .a .pill { font-size: 12px; font-weight: 700; padding: 3px 9px; border-radius: 99px; }
+  .a .nav { position: absolute; bottom: 0; left: 0; right: 0; height: 82px; background: #fff; border-radius: 26px 26px 0 0; display: flex; justify-content: space-around; padding-top: 12px; box-shadow: 0 -4px 20px rgba(120,80,40,.08); color: #b9a693; font-size: 12px; font-weight: 700; }
+  .a .nav div { display: grid; justify-items: center; gap: 4px; }
+  .a .nav .on { color: #e07a52; }
+  .a .crumb { color: #b0896a; font-size: 14px; font-weight: 700; margin: 6px 0 8px; }
+  .a .hero { background: linear-gradient(135deg, #fde6d4, #fbefe0); border-radius: 26px; padding: 20px; margin-bottom: 18px; }
+  .a .hero .k { font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: #c9683f; }
+  .a .hero h1 { font: 800 27px/1.15 'Nunito'; margin: 6px 0 8px; }
+  .a .hero p { margin: 0; font-size: 16px; line-height: 1.5; color: #5c4a3a; }
+  .a .node { background: #fff; border-radius: 20px; padding: 14px 16px; margin-bottom: 10px; box-shadow: 0 2px 10px rgba(120,80,40,.07); }
+  .a .node .t { display: flex; justify-content: space-between; align-items: center; font-weight: 800; font-size: 15px; margin-bottom: 4px; }
+  .a .node p { margin: 0; font-size: 15.5px; line-height: 1.45; color: #5c4a3a; }
+  .a .node .go { font-size: 13px; font-weight: 700; color: #e07a52; }
+  .a .done { background: #f2f7ee; } .a .done .t::after { }
+
+  /* ====================================================== B. CALM CLINIC */
+  .b { background: #f4f7f8; color: #12262b; font-family: 'Inter', sans-serif; }
+  .b .wrap { padding: 4px 20px; }
+  .b .top { display: flex; justify-content: space-between; align-items: center; margin: 6px 0 16px; }
+  .b .hello { font: 700 26px/1.2 'Inter'; letter-spacing: -.02em; margin: 0; }
+  .b .avatar { width: 40px; height: 40px; border-radius: 50%; background: #d7eef0; color: #0f7c86; display: grid; place-items: center; font-weight: 700; }
+  .b .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 16px; }
+  .b .stat { background: #fff; border-radius: 16px; padding: 12px; border: 1px solid #e3eaec; }
+  .b .stat b { display: block; font-size: 22px; letter-spacing: -.02em; }
+  .b .stat small { color: #6b7f84; font-size: 12px; }
+  .b .capture { display: flex; align-items: center; gap: 10px; background: #fff; border: 1px solid #dbe4e6; border-radius: 14px; padding: 13px 14px; color: #8a9a9e; font-size: 15px; }
+  .b .capture .plus { margin-left: auto; color: #0f7c86; font-weight: 600; font-size: 14px; }
+  .b h2 { font: 600 13px 'Inter'; color: #6b7f84; margin: 22px 0 8px; display: flex; justify-content: space-between; }
+  .b h2 a { color: #0f7c86; }
+  .b .card { background: #fff; border: 1px solid #e3eaec; border-radius: 16px; padding: 13px 14px; margin-bottom: 8px; display: flex; gap: 12px; align-items: center; }
+  .b .ring { width: 40px; height: 40px; flex-shrink: 0; }
+  .b .card b { display: block; font-size: 15.5px; font-weight: 600; }
+  .b .card small { color: #6b7f84; font-size: 13px; }
+  .b .tag { font-size: 11.5px; font-weight: 600; color: #b45309; background: #fef3e2; padding: 2px 8px; border-radius: 6px; margin-left: auto; }
+  .b .nav { position: absolute; bottom: 0; left: 0; right: 0; height: 80px; background: #fff; border-top: 1px solid #e3eaec; display: flex; justify-content: space-around; padding-top: 10px; color: #8a9a9e; font-size: 11.5px; font-weight: 500; }
+  .b .nav div { display: grid; justify-items: center; gap: 4px; }
+  .b .nav .on { color: #0f7c86; }
+  .b .crumb { color: #0f7c86; font-size: 13.5px; font-weight: 500; margin: 6px 0 10px; }
+  .b .hero { background: #fff; border: 1px solid #e3eaec; border-radius: 18px; padding: 18px; margin-bottom: 14px; }
+  .b .hero .k { display: inline-block; font-size: 11.5px; font-weight: 600; color: #0f7c86; background: #e3f4f5; padding: 3px 9px; border-radius: 6px; }
+  .b .hero h1 { font: 700 24px/1.2 'Inter'; letter-spacing: -.02em; margin: 10px 0 6px; }
+  .b .hero p { margin: 0; font-size: 15px; line-height: 1.5; color: #3d5359; }
+  .b .bar { height: 6px; background: #e3eaec; border-radius: 3px; margin-top: 14px; overflow: hidden; } .b .bar span { display: block; width: 28%; height: 100%; background: #0f7c86; }
+  .b .barl { font-size: 12px; color: #6b7f84; margin-top: 6px; }
+  .b .node { background: #fff; border: 1px solid #e3eaec; border-radius: 14px; padding: 13px 14px; margin-bottom: 8px; display: flex; gap: 12px; }
+  .b .num { width: 26px; height: 26px; border-radius: 8px; background: #e3f4f5; color: #0f7c86; font-weight: 700; font-size: 13px; display: grid; place-items: center; flex-shrink: 0; }
+  .b .node.read .num { background: #0f7c86; color: #fff; }
+  .b .node .t { font-weight: 600; font-size: 14.5px; margin-bottom: 3px; }
+  .b .node p { margin: 0; font-size: 14.5px; line-height: 1.45; color: #3d5359; }
+  .b .chev { margin-left: auto; color: #a9b8bb; align-self: center; }
+
+  /* ====================================================== C. BRIGHT STUDY */
+  .c { background: #fffdf8; color: #1d1b3a; font-family: 'Plus Jakarta Sans', sans-serif; }
+  .c .wrap { padding: 4px 20px; }
+  .c .hello { font: 600 32px/1.1 'Fraunces', serif; margin: 10px 0 4px; letter-spacing: -.01em; }
+  .c .sub { color: #6c6990; font-size: 15px; margin: 0 0 16px; }
+  .c .streak { display: flex; gap: 10px; background: #1d1b3a; color: #fff; border-radius: 22px; padding: 16px 18px; align-items: center; margin-bottom: 14px; }
+  .c .streak b { font-size: 22px; }
+  .c .streak small { color: #c9c6ec; font-size: 13px; display: block; }
+  .c .streak .go { margin-left: auto; background: #ffd166; color: #1d1b3a; font-weight: 800; border-radius: 14px; padding: 9px 14px; font-size: 14px; }
+  .c .capture { display: flex; align-items: center; gap: 10px; background: #f3f1ff; border-radius: 18px; padding: 14px 16px; color: #7f7aa8; font-size: 15.5px; font-weight: 500; }
+  .c h2 { font: 800 16px 'Plus Jakarta Sans'; margin: 22px 0 10px; }
+  .c .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .c .tile { border-radius: 22px; padding: 14px; min-height: 120px; display: flex; flex-direction: column; }
+  .c .tile b { font-size: 15.5px; line-height: 1.25; }
+  .c .tile small { margin-top: auto; font-size: 12.5px; font-weight: 600; opacity: .75; }
+  .c .t1 { background: #ffe1d6; } .c .t2 { background: #dff3e4; } .c .t3 { background: #e3e4ff; } .c .t4 { background: #fff1c7; }
+  .c .nav { position: absolute; bottom: 14px; left: 20px; right: 20px; height: 64px; background: #1d1b3a; border-radius: 22px; display: flex; justify-content: space-around; align-items: center; color: #8e8bb8; }
+  .c .nav .on { color: #ffd166; }
+  .c .crumb { font-size: 13.5px; font-weight: 600; color: #6c6990; margin: 6px 0 10px; }
+  .c .hero { background: #1d1b3a; color: #fff; border-radius: 26px; padding: 20px; margin-bottom: 16px; }
+  .c .hero .k { font-size: 12px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: #ffd166; }
+  .c .hero h1 { font: 600 28px/1.15 'Fraunces', serif; margin: 6px 0 8px; }
+  .c .hero p { margin: 0; font-size: 15.5px; line-height: 1.5; color: #dcdaf5; }
+  .c .node { border-radius: 20px; padding: 14px 16px; margin-bottom: 10px; }
+  .c .node .t { font-weight: 800; font-size: 15px; margin-bottom: 4px; display: flex; justify-content: space-between; }
+  .c .node p { margin: 0; font-size: 15px; line-height: 1.45; }
+  .c .node .arrow { font-weight: 800; }
+</style>
+</head>
+<body>
+<!-- Icons -->
+<svg width="0" height="0" style="position:absolute"><defs>
+  <symbol fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" id="sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+  <symbol fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" id="list" viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01"/></symbol>
+  <symbol fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" id="book" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5v14zM4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"/></symbol>
+  <symbol fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" id="gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9 7 7M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1"/></symbol>
+  <symbol fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" id="map" viewBox="0 0 24 24"><circle cx="5" cy="12" r="2"/><circle cx="19" cy="5" r="2"/><circle cx="19" cy="19" r="2"/><path d="M7 12h4l6-7M11 12l6 7"/></symbol>
+  <symbol fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" id="back" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></symbol>
+  <symbol fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" id="chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></symbol>
+  <symbol fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" id="plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+</defs></svg>
+
+<!-- ============================================================ A -->
+<div class="phone a" id="a-home">
+  <div class="status"><span>8:12</span><span>●●●</span></div>
+  <div class="wrap">
+    <p class="hello">Good morning ☀️</p>
+    <p class="sub">3 topics waiting from rounds</p>
+    <div class="capture">What came up today?<span class="plus">+</span></div>
+    <h2>Due soon</h2>
+    <div class="card"><div class="emoji" style="background:#fde3d5">🫀</div><div><b>Types of MI</b><small>Cardiology · 6 min to the gist</small></div><span class="pill" style="background:#fde3d5;color:#c9683f;margin-left:auto">Tomorrow</span></div>
+    <div class="card"><div class="emoji" style="background:#e3efe0">🩸</div><div><b>Transfusion thresholds</b><small>Hematology · 4 min to the gist</small></div><span class="pill" style="background:#e3efe0;color:#4f7a3a;margin-left:auto">Mon</span></div>
+    <h2>Keep going</h2>
+    <div class="card"><div class="emoji" style="background:#e5e7f6">🌀</div><div><b>Dix-Hallpike vs HINTS</b><small>12 of 34 read · last Tuesday</small></div></div>
+    <div class="card"><div class="emoji" style="background:#f7ecd2">💊</div><div><b>Ramipril</b><small>Not started</small></div></div>
+  </div>
+  <div class="nav"><div class="on"><svg class="ico"><use href="#sun"/></svg>Today</div><div><svg class="ico"><use href="#list"/></svg>Lists</div><div><svg class="ico"><use href="#book"/></svg>Library</div><div><svg class="ico"><use href="#gear"/></svg>Settings</div></div>
+</div>
+
+<div class="phone a" id="a-tree">
+  <div class="status"><span>8:12</span><span>●●●</span></div>
+  <div class="wrap">
+    <div style="display:flex;justify-content:space-between;align-items:center"><svg class="ico" style="width:24px;height:24px"><use href="#back"/></svg><span style="background:#fff;border-radius:14px;padding:8px 12px;font-weight:700;font-size:14px;box-shadow:0 2px 10px rgba(120,80,40,.08);display:flex;gap:6px;align-items:center"><svg class="ico" style="width:16px;height:16px"><use href="#map"/></svg>Map</span></div>
+    <p class="crumb">Types of MI › Overview</p>
+    <div class="hero"><div class="k">Disease</div><h1>Myocardial infarction</h1><p>Death of heart muscle from prolonged ischemia, classified by cause into five types.</p></div>
+    <div class="node done"><div class="t">Background <span class="go">✓ read</span></div><p>Defined by a troponin rise above the 99th centile with a rise or fall, plus evidence of ischemia.</p></div>
+    <div class="node"><div class="t">Pathophysiology <span class="go">go deeper →</span></div><p>Type 1 is plaque rupture with thrombus; type 2 is a supply–demand mismatch without rupture.</p></div>
+    <div class="node"><div class="t">Presentation <span class="go">go deeper →</span></div><p>Pressure-like chest pain over 20 minutes, often with sweating, nausea or breathlessness.</p></div>
+    <div class="node"><div class="t">Diagnosis <span class="go">go deeper →</span></div><p>Serial high-sensitivity troponin and an ECG within 10 minutes of arrival.</p></div>
+  </div>
+</div>
+
+<!-- ============================================================ B -->
+<div class="phone b" id="b-home">
+  <div class="status"><span>8:12</span><span>●●●</span></div>
+  <div class="wrap">
+    <div class="top"><p class="hello">Good morning</p><div class="avatar">R</div></div>
+    <div class="stats"><div class="stat"><b>3</b><small>due this week</small></div><div class="stat"><b>41</b><small>nodes read</small></div><div class="stat"><b>5</b><small>day streak</small></div></div>
+    <div class="capture"><svg class="ico" style="color:#0f7c86"><use href="#plus"/></svg>Add a topic from rounds<span class="plus">Save</span></div>
+    <h2>Due soon <a>See all</a></h2>
+    <div class="card"><svg class="ring" viewBox="0 0 40 40"><circle cx="20" cy="20" r="16" fill="none" stroke="#e3eaec" stroke-width="4"/><circle cx="20" cy="20" r="16" fill="none" stroke="#0f7c86" stroke-width="4" stroke-dasharray="30 100" transform="rotate(-90 20 20)"/></svg><div><b>Types of MI</b><small>Cardiology · 6 min</small></div><span class="tag">Tomorrow</span></div>
+    <div class="card"><svg class="ring" viewBox="0 0 40 40"><circle cx="20" cy="20" r="16" fill="none" stroke="#e3eaec" stroke-width="4"/><circle cx="20" cy="20" r="16" fill="none" stroke="#0f7c86" stroke-width="4" stroke-dasharray="70 100" transform="rotate(-90 20 20)"/></svg><div><b>Transfusion thresholds</b><small>Hematology · 4 min</small></div><span class="tag">Mon</span></div>
+    <h2>Continue</h2>
+    <div class="card"><svg class="ring" viewBox="0 0 40 40"><circle cx="20" cy="20" r="16" fill="none" stroke="#e3eaec" stroke-width="4"/><circle cx="20" cy="20" r="16" fill="none" stroke="#0f7c86" stroke-width="4" stroke-dasharray="35 100" transform="rotate(-90 20 20)"/></svg><div><b>Dix-Hallpike vs HINTS</b><small>12 of 34 read</small></div><svg class="ico chev" style="margin-left:auto;color:#a9b8bb"><use href="#chev"/></svg></div>
+    <div class="card"><svg class="ring" viewBox="0 0 40 40"><circle cx="20" cy="20" r="16" fill="none" stroke="#e3eaec" stroke-width="4"/></svg><div><b>Ramipril</b><small>Not started</small></div><svg class="ico chev" style="margin-left:auto;color:#a9b8bb"><use href="#chev"/></svg></div>
+  </div>
+  <div class="nav"><div class="on"><svg class="ico"><use href="#sun"/></svg>Today</div><div><svg class="ico"><use href="#list"/></svg>Lists</div><div><svg class="ico"><use href="#book"/></svg>Library</div><div><svg class="ico"><use href="#gear"/></svg>Settings</div></div>
+</div>
+
+<div class="phone b" id="b-tree">
+  <div class="status"><span>8:12</span><span>●●●</span></div>
+  <div class="wrap">
+    <div style="display:flex;justify-content:space-between;align-items:center;color:#0f7c86"><svg class="ico" style="width:24px;height:24px"><use href="#back"/></svg><span style="border:1px solid #dbe4e6;background:#fff;border-radius:10px;padding:7px 11px;font-weight:600;font-size:13.5px;display:flex;gap:6px;align-items:center"><svg class="ico" style="width:16px;height:16px"><use href="#map"/></svg>Map</span></div>
+    <p class="crumb">Types of MI  ›  Overview</p>
+    <div class="hero"><span class="k">Disease</span><h1>Myocardial infarction</h1><p>Death of heart muscle from prolonged ischemia, classified by cause into five types.</p><div class="bar"><span></span></div><div class="barl">2 of 7 sections read</div></div>
+    <div class="node read"><span class="num">✓</span><div><div class="t">Background</div><p>Defined by a troponin rise above the 99th centile with a rise or fall, plus evidence of ischemia.</p></div></div>
+    <div class="node"><span class="num">2</span><div><div class="t">Pathophysiology</div><p>Type 1 is plaque rupture with thrombus; type 2 is a supply–demand mismatch without rupture.</p></div><svg class="ico chev"><use href="#chev"/></svg></div>
+    <div class="node"><span class="num">3</span><div><div class="t">Presentation</div><p>Pressure-like chest pain over 20 minutes, often with sweating, nausea or breathlessness.</p></div><svg class="ico chev"><use href="#chev"/></svg></div>
+    <div class="node"><span class="num">4</span><div><div class="t">Diagnosis</div><p>Serial high-sensitivity troponin and an ECG within 10 minutes of arrival.</p></div><svg class="ico chev"><use href="#chev"/></svg></div>
+  </div>
+</div>
+
+<!-- ============================================================ C -->
+<div class="phone c" id="c-home">
+  <div class="status"><span>8:12</span><span>●●●</span></div>
+  <div class="wrap">
+    <p class="hello">Morning, doctor.</p>
+    <p class="sub">Small steps, every day.</p>
+    <div class="streak"><div><b>🔥 5 days</b><small>12 minutes yesterday</small></div><span class="go">Continue</span></div>
+    <div class="capture"><svg class="ico"><use href="#plus"/></svg>Something to learn from rounds…</div>
+    <h2>Your topics</h2>
+    <div class="grid">
+      <div class="tile t1"><b>Types of MI</b><small>Due tomorrow</small></div>
+      <div class="tile t2"><b>Transfusion thresholds</b><small>Due Monday</small></div>
+      <div class="tile t3"><b>Dix-Hallpike vs HINTS</b><small>12 / 34 read</small></div>
+      <div class="tile t4"><b>Ramipril</b><small>New</small></div>
+    </div>
+  </div>
+  <div class="nav"><svg class="ico on"><use href="#sun"/></svg><svg class="ico"><use href="#list"/></svg><svg class="ico"><use href="#book"/></svg><svg class="ico"><use href="#gear"/></svg></div>
+</div>
+
+<div class="phone c" id="c-tree">
+  <div class="status"><span>8:12</span><span>●●●</span></div>
+  <div class="wrap">
+    <div style="display:flex;justify-content:space-between;align-items:center"><svg class="ico" style="width:24px;height:24px"><use href="#back"/></svg><span style="background:#f3f1ff;border-radius:14px;padding:8px 12px;font-weight:700;font-size:14px;display:flex;gap:6px;align-items:center"><svg class="ico" style="width:16px;height:16px"><use href="#map"/></svg>Map</span></div>
+    <p class="crumb">Types of MI › Overview</p>
+    <div class="hero"><div class="k">Disease · 7 branches</div><h1>Myocardial infarction</h1><p>Death of heart muscle from prolonged ischemia, classified by cause into five types.</p></div>
+    <div class="node t2" style="background:#dff3e4"><div class="t">✓ Background</div><p>Defined by a troponin rise above the 99th centile with a rise or fall, plus evidence of ischemia.</p></div>
+    <div class="node" style="background:#ffe1d6"><div class="t">Pathophysiology <span class="arrow">→</span></div><p>Type 1 is plaque rupture with thrombus; type 2 is a supply–demand mismatch without rupture.</p></div>
+    <div class="node" style="background:#e3e4ff"><div class="t">Presentation <span class="arrow">→</span></div><p>Pressure-like chest pain over 20 minutes, often with sweating, nausea or breathlessness.</p></div>
+    <div class="node" style="background:#fff1c7"><div class="t">Diagnosis <span class="arrow">→</span></div><p>Serial high-sensitivity troponin and an ECG within 10 minutes of arrival.</p></div>
+  </div>
+</div>
+<script>
+  // styles.html#a shows only style A (home + tree), for screenshots
+  const k = location.hash.slice(1);
+  if (k) document.querySelectorAll('.phone').forEach((p) => { if (!p.id.startsWith(k + '-')) p.remove(); });
+</script>
+</body>
+</html>

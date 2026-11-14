@@ -12,6 +12,19 @@ const parseVec = (v) => (typeof v === 'string' ? Float32Array.from(JSON.parse(v)
 const now = () => new Date().toISOString();
 
 const urlCache = new Map(); // path -> {url, exp}
+function summarise(rows) {
+  const m = {};
+  for (const r of rows) {
+    const p = (m[r.item_id] ||= { total: 0, read: 0, last: null, readToday: 0 });
+    p.total++;
+    if (r.visited_at) {
+      p.read++;
+      if (!p.last || r.visited_at > p.last) p.last = r.visited_at;
+      if (new Date(r.visited_at).toDateString() === new Date().toDateString()) p.readToday++;
+    }
+  }
+  return m;
+}
 let noteUnavailable = false;
 let userId = null;
 
@@ -182,6 +195,15 @@ export const supabase = {
     const nodes = check(await sb.from('tree_nodes').select('id').eq('item_id', itemId));
     if (!nodes.length) return [];
     return check(await sb.from('node_marks').select('*').in('node_id', nodes.map((n) => n.id)));
+  },
+  /** item_id -> {total, read, last} over all tree nodes (paged: the API returns at most 1000 rows). */
+  async treeProgress() {
+    const rows = [];
+    for (let from = 0; ; from += 1000) {
+      const page = check(await sb.from('tree_nodes').select('item_id,visited_at').range(from, from + 999));
+      rows.push(...page); if (page.length < 1000) break;
+    }
+    return summarise(rows);
   },
   async markVisited(nodeId, count) {
     await sb.from('tree_nodes').update({ visited_at: now(), visit_count: count }).eq('id', nodeId);
