@@ -30,7 +30,7 @@ export function leaveTree() {
   if (!state) return;
   state.unsub?.(); clearTimeout(state.timer);
   state = null;
-  document.body.classList.remove('reading');
+  document.body.classList.remove('reading', 'lb-open');
 }
 
 async function refresh() {
@@ -134,6 +134,7 @@ function bind(root) {
     const menu = e.target.closest('[data-menu]');
     if (menu) return openNodeMenu(menu.dataset.menu);
     if (e.target.closest('.sheet-close') || e.target.classList.contains('sheet')) return closeSheet();
+    if (e.target.closest('.sheet a[href^="#/"]')) closeSheet(); // a link inside a panel: close it, then navigate
   });
 }
 

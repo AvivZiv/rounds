@@ -80,6 +80,9 @@ function route(navigated) {
   const view = document.getElementById('view');
   if (!view) return;
   const { name, args } = currentRoute();
+  // A panel (map, figure viewer, book passages) locks page scrolling while open; any
+  // navigation closes it, so the lock can never outlive the panel.
+  if (navigated) document.body.classList.remove('lb-open');
   if (lastName === 'read' && name !== 'read') leaveReader();
   if (lastName === 'tree' && name !== 'tree') leaveTree();
   // Preserve scroll position on data-driven re-renders.
