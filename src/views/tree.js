@@ -160,18 +160,59 @@ function openMap() {
   const byParent = new Map();
   for (const n of s.nodes) { const k = n.parent_id || 'root'; if (!byParent.has(k)) byParent.set(k, []); byParent.get(k).push(n); }
   const rootNode = s.nodes.find((n) => !n.parent_id);
+  if (!rootNode) return;
   const marked = new Set(s.marks.map((m) => m.node_id));
   const visited = s.nodes.filter((n) => n.visited_at);
   const last = visited.map((n) => n.visited_at).sort().at(-1);
-  const branch = (n) => {
+
+  // ---- layout: root on the left, depth along x, leaves stacked along y (tidy tree, centred parents)
+  const W = 150, H = 30, GX = 46, GY = 10;
+  const pos = new Map();
+  let cursor = 0;
+  const place = (n, depth) => {
     const kids = (byParent.get(n.id) || []).sort((a, b) => a.ord - b.ord);
-    const cls = [n.id === s.focusId ? 'on' : '', n.visited_at ? 'seen' : 'unseen', marked.has(n.id) ? 'marked' : ''].join(' ');
-    return `<li><a href="#/tree/${s.itemId}/${n.id}" class="${cls}" title="${n.visited_at ? 'Read ' + new Date(n.visited_at).toLocaleDateString() : 'Not read yet'}"><span class="dot"></span>${esc(n.label)}${kids.length ? '' : n.expandable ? ' <span class="muted">…</span>' : ''}</a>${kids.length ? `<ul>${kids.map(branch).join('')}</ul>` : ''}</li>`;
+    let y;
+    if (!kids.length) { y = cursor; cursor += H + GY; }
+    else { const ys = kids.map((k) => place(k, depth + 1)); y = (ys[0] + ys[ys.length - 1]) / 2; }
+    pos.set(n.id, { x: depth * (W + GX), y, depth });
+    return y;
   };
+  place(rootNode, 0);
+  const maxDepth = Math.max(...[...pos.values()].map((p) => p.depth));
+  const width = (maxDepth + 1) * (W + GX) - GX + 8, height = cursor - GY + 8;
+
+  // ---- draw
+  const label = (t) => (t.length > 21 ? t.slice(0, 20).replace(/\s+\S*$/, '') + '…' : t);
+  let links = '', boxes = '';
+  for (const n of s.nodes) {
+    const p = pos.get(n.id); if (!p) continue;
+    const par = n.parent_id && pos.get(n.parent_id);
+    if (par) {
+      const x1 = par.x + W + 4, y1 = par.y + H / 2 + 4, x2 = p.x + 4, y2 = p.y + H / 2 + 4, mx = (x1 + x2) / 2;
+      links += `<path class="tl ${n.visited_at ? 'seen' : ''}" d="M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}"/>`;
+    }
+    const kids = byParent.get(n.id)?.length || 0;
+    const cls = ['tn', n.visited_at ? 'seen' : 'unseen', marked.has(n.id) ? 'marked' : '', n.id === s.focusId ? 'on' : '', !kids && n.expandable ? 'more' : ''].join(' ');
+    boxes += `<a href="#/tree/${s.itemId}/${n.id}" class="${cls}" transform="translate(${p.x + 4},${p.y + 4})">
+      <title>${esc(n.label)} — ${n.visited_at ? 'read ' + new Date(n.visited_at).toLocaleDateString() : 'not read yet'}${!kids && n.expandable ? ' · can go deeper' : ''}</title>
+      <rect width="${W}" height="${H}" rx="8"/><text x="10" y="${H / 2 + 4}">${esc(label(n.label))}</text>${!kids && n.expandable ? `<text class="dots" x="${W - 14}" y="${H / 2 + 4}">…</text>` : ''}</a>`;
+  }
+  const svg = `<svg class="treemap" viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">${links}${boxes}</svg>`;
   sheet(`<h3>Where you went</h3>
-    <p class="muted small">${visited.length} of ${s.nodes.length} nodes read${last ? ` · last ${new Date(last).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}` : ''}.
+    <p class="muted small">${visited.length} of ${s.nodes.length} nodes read${last ? ` · last ${new Date(last).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}` : ''}
       <span class="legend"><span class="dot seen"></span>read <span class="dot unseen"></span>built, not read <span class="dot marked"></span>marked · “…” can go deeper</span></p>
-    <ul class="map">${rootNode ? branch(rootNode) : ''}</ul>`, true);
+    <div class="tm-tools"><button class="btn small ghost" data-zoom="-1" aria-label="Zoom out">−</button><button class="btn small ghost" data-zoom="1" aria-label="Zoom in">+</button><button class="btn small ghost" data-zoom="0">Fit</button></div>
+    <div class="tm-scroll"><div class="tm-canvas">${svg}</div></div>`, true);
+  // zoom: scale the canvas; Fit = whole tree width in view
+  const scroll = $('.tm-scroll', s.root), canvas = $('.tm-canvas', s.root);
+  let scale = 1;
+  const apply = () => { canvas.style.transform = `scale(${scale})`; canvas.style.width = width + 'px'; canvas.style.height = height + 'px'; canvas.style.transformOrigin = '0 0'; canvas.parentElement.style.height = height * scale + 'px'; };
+  const fit = () => { scale = Math.min(1, (scroll.clientWidth - 8) / width); apply(); };
+  $('.tm-tools', s.root).addEventListener('click', (e) => {
+    const z = e.target.closest('[data-zoom]')?.dataset.zoom; if (z == null) return;
+    if (z === '0') fit(); else { scale = Math.min(2, Math.max(0.3, scale * (z === '1' ? 1.25 : 0.8))); apply(); }
+  });
+  requestAnimationFrame(fit);
 }
 
 async function openBooks(nodeId) {

@@ -423,3 +423,19 @@ body.lb-open { overflow: hidden; }
 .map a.marked .dot, .legend .dot.marked { background: var(--hl); border-color: var(--soon); }
 .legend { display: inline-flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; margin-left: 4px; }
 .legend .dot { margin-right: 2px; }
+
+/* tree diagram */
+.tm-tools { display: flex; gap: 6px; margin: 6px 0 8px; }
+.tm-scroll { overflow: auto; max-height: 70vh; border: 1px solid var(--line); border-radius: 12px; background: var(--card); padding: 4px; }
+.tm-canvas { display: block; }
+.treemap { display: block; font-family: var(--sans); }
+.treemap .tl { fill: none; stroke: var(--line); stroke-width: 1.5; }
+.treemap .tl.seen { stroke: var(--c6); }
+.treemap .tn rect { fill: var(--paper); stroke: var(--muted); stroke-width: 1.2; }
+.treemap .tn text { font-size: 12.5px; fill: var(--muted); }
+.treemap .tn.seen rect { fill: color-mix(in srgb, var(--c6) 18%, var(--paper)); stroke: var(--c6); }
+.treemap .tn.seen text { fill: var(--ink); font-weight: 600; }
+.treemap .tn.marked rect { stroke: var(--soon); stroke-width: 2.2; }
+.treemap .tn.on rect { stroke: var(--accent); stroke-width: 2.4; }
+.treemap .tn .dots { fill: var(--muted); font-weight: 700; }
+.treemap .tn:hover rect { stroke: var(--accent); }
