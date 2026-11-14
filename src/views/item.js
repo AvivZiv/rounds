@@ -24,6 +24,10 @@ export function renderItem(root, id) {
           <span class="read-depth">${icon('list')} Open</span>
           <span class="read-time">Short paragraphs, go as deep as you need</span>
         </a>
+        <a class="read-btn" href="#/tree/${item.id}/map">
+          <span class="read-depth">${icon('repeat')} Review</span>
+          <span class="read-time">Map of where you went</span>
+        </a>
       </div>
       ${hasBooks ? `<div class="row wrap small-row"><span class="muted small">From your books:</span>${item.coverage === 'none' ? '<span class="muted small">not covered</span>' : readBtn('basic', item.est_basic_min) + readBtn('expanded', item.est_expanded_min)}</div>` : ''}
       <div class="fields">

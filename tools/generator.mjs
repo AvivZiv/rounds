@@ -60,18 +60,20 @@ async function step() {
   const [shallow] = check(await sb.from('tree_nodes').select('*').eq('children', 'none').eq('expandable', true).lt('depth', PREBUILD_DEPTH).order('created_at').limit(1));
   if (shallow) {
     const item = items.find((i) => i.id === shallow.item_id);
-    if (item) { await expand(item, shallow); return true; }
+    if (item && (await claim(shallow.id))) { await expand(item, shallow); return true; }
+    return !!item; // someone else claimed it; look again
   }
   return false;
 }
 
 async function handle(req) {
-  check(await sb.from('tree_requests').update({ status: 'running', started_at: new Date().toISOString() }).eq('id', req.id));
+  const got = check(await sb.from('tree_requests').update({ status: 'running', started_at: new Date().toISOString() }).eq('id', req.id).eq('status', 'pending').select('id'));
+  if (!got.length) return; // another generator took it
   try {
     const item = check(await sb.from('items').select('id,title,note').eq('id', req.item_id).single());
     if (req.node_id) {
       const node = check(await sb.from('tree_nodes').select('*').eq('id', req.node_id).single());
-      if (node.children !== 'ready') await expand(item, node);
+      if (node.children === 'none' ? await claim(node.id) : node.children === 'pending' && !(await childrenExist(node.id))) await expand(item, node);
     } else {
       const roots = check(await sb.from('tree_nodes').select('id').eq('item_id', item.id).is('parent_id', null));
       if (!roots.length) await buildRoot(item);
@@ -87,12 +89,21 @@ async function handle(req) {
 async function buildRoot(item) {
   log(`root: ${item.title}`);
   const g = await generate({ topic: item.title, note: item.note, level: levelLine(settings) }, null);
+  // Another generator may have built this root while we were generating.
+  if ((check(await sb.from('tree_nodes').select('id').eq('item_id', item.id).is('parent_id', null))).length) { log('root already built elsewhere, skipping'); return; }
   const root = check(await sb.from('tree_nodes').insert({
     item_id: item.id, parent_id: null, depth: 0, ord: 0, label: item.title, text: g.root.summary,
     expandable: true, children: 'ready', topic_type: g.root.topic_type, model: g.model,
   }).select().single());
   check(await sb.from('tree_nodes').insert(g.nodes.map((n) => ({ item_id: item.id, parent_id: root.id, depth: 1, ...n, children: 'none', model: g.model }))));
 }
+
+/** Mark a node as being expanded; false if another process got there first. */
+async function claim(nodeId) {
+  const rows = check(await sb.from('tree_nodes').update({ children: 'pending' }).eq('id', nodeId).eq('children', 'none').select('id'));
+  return rows.length > 0;
+}
+async function childrenExist(nodeId) { return (check(await sb.from('tree_nodes').select('id').eq('parent_id', nodeId).limit(1))).length > 0; }
 
 async function expand(item, node) {
   log(`expand: ${item.title} > ${node.label}`);

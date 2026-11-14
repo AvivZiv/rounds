@@ -210,6 +210,7 @@ export const local = {
   subscribeTree(itemId, onChange) { return () => {}; },
   async pendingRequest() { return null; },
   async listMarks(itemId) { const ids = new Set((await byIndex('tree_nodes', 'item_id', itemId)).map((n) => n.id)); return (await all('node_marks')).filter((m) => ids.has(m.node_id)); },
+  async markVisited(nodeId, count) { const n = await get('tree_nodes', nodeId); if (n) await put('tree_nodes', { ...n, visited_at: now(), visit_count: count }); },
   async setMark(nodeId, style) {
     const existing = (await byIndex('node_marks', 'node_id', nodeId))[0];
     if (!style) { if (existing) await del('node_marks', existing.id); return null; }

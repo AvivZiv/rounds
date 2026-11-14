@@ -183,6 +183,9 @@ export const supabase = {
     if (!nodes.length) return [];
     return check(await sb.from('node_marks').select('*').in('node_id', nodes.map((n) => n.id)));
   },
+  async markVisited(nodeId, count) {
+    await sb.from('tree_nodes').update({ visited_at: now(), visit_count: count }).eq('id', nodeId);
+  },
   async setMark(nodeId, style) {
     if (!style) { check(await sb.from('node_marks').delete().eq('node_id', nodeId)); return null; }
     return check(await sb.from('node_marks').upsert({ node_id: nodeId, style }, { onConflict: 'node_id' }).select().single());

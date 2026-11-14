@@ -413,3 +413,13 @@ body.lb-open { overflow: hidden; }
 @media (min-width: 900px) { .sheet { align-items: center; } .sheet-inner { border-radius: 18px; } }
 .small-row { flex-wrap: wrap; gap: 6px; margin: 4px 0 14px; }
 .read-btn.grow { flex: 1; }
+
+/* study trail on the map */
+.map a { display: flex; align-items: center; gap: 8px; }
+.map a.unseen { color: var(--muted); }
+.map a.seen { color: var(--ink); }
+.map .dot, .legend .dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; border: 1.5px solid var(--muted); background: transparent; display: inline-block; vertical-align: middle; }
+.map a.seen .dot, .legend .dot.seen { background: var(--c6); border-color: var(--c6); }
+.map a.marked .dot, .legend .dot.marked { background: var(--hl); border-color: var(--soon); }
+.legend { display: inline-flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; margin-left: 4px; }
+.legend .dot { margin-right: 2px; }

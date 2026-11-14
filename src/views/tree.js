@@ -8,11 +8,12 @@ import { shortTitle } from '../lib/lesson.js';
 let state = null; // { itemId, focusId, nodes, marks, unsub, timer }
 
 export async function renderTree(root, itemId, focusId = null) {
+  const wantMap = focusId === 'map'; if (wantMap) focusId = null;
   leaveTree();
   const item = store.item(itemId);
   if (!item) { root.innerHTML = '<p class="empty">Item not found.</p>'; return; }
   document.body.classList.add('reading');
-  state = { itemId, focusId, nodes: [], marks: [], root, item, waitingSince: null };
+  state = { itemId, focusId, nodes: [], marks: [], root, item, waitingSince: null, openMapOnce: wantMap };
   root.innerHTML = `<div class="tree"><div class="tree-bar">
       <a class="back" href="#/item/${item.id}" aria-label="Back to item">${icon('back')}</a>
       <span class="bar-title">${esc(item.title)}</span>
@@ -56,7 +57,13 @@ async function refresh() {
     return;
   }
   if (focus.children === 'ready') s.waitingSince = null;
+  if (s.visited !== focus.id) {
+    s.visited = focus.id;
+    focus.visit_count = (focus.visit_count || 0) + 1; focus.visited_at = new Date().toISOString();
+    db.markVisited(focus.id, focus.visit_count).catch(() => {});
+  }
   draw();
+  if (s.openMapOnce) { s.openMapOnce = false; openMap(); }
 }
 
 function showError(e) {
@@ -153,11 +160,18 @@ function openMap() {
   const byParent = new Map();
   for (const n of s.nodes) { const k = n.parent_id || 'root'; if (!byParent.has(k)) byParent.set(k, []); byParent.get(k).push(n); }
   const rootNode = s.nodes.find((n) => !n.parent_id);
+  const marked = new Set(s.marks.map((m) => m.node_id));
+  const visited = s.nodes.filter((n) => n.visited_at);
+  const last = visited.map((n) => n.visited_at).sort().at(-1);
   const branch = (n) => {
     const kids = (byParent.get(n.id) || []).sort((a, b) => a.ord - b.ord);
-    return `<li><a href="#/tree/${s.itemId}/${n.id}" class="${n.id === s.focusId ? 'on' : ''}">${esc(n.label)}${kids.length ? '' : n.expandable ? ' <span class="muted">…</span>' : ''}</a>${kids.length ? `<ul>${kids.map(branch).join('')}</ul>` : ''}</li>`;
+    const cls = [n.id === s.focusId ? 'on' : '', n.visited_at ? 'seen' : 'unseen', marked.has(n.id) ? 'marked' : ''].join(' ');
+    return `<li><a href="#/tree/${s.itemId}/${n.id}" class="${cls}" title="${n.visited_at ? 'Read ' + new Date(n.visited_at).toLocaleDateString() : 'Not read yet'}"><span class="dot"></span>${esc(n.label)}${kids.length ? '' : n.expandable ? ' <span class="muted">…</span>' : ''}</a>${kids.length ? `<ul>${kids.map(branch).join('')}</ul>` : ''}</li>`;
   };
-  sheet(`<h3>Map</h3><p class="muted small">Everything built so far. “…” = can go deeper.</p><ul class="map">${rootNode ? branch(rootNode) : ''}</ul>`, true);
+  sheet(`<h3>Where you went</h3>
+    <p class="muted small">${visited.length} of ${s.nodes.length} nodes read${last ? ` · last ${new Date(last).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}` : ''}.
+      <span class="legend"><span class="dot seen"></span>read <span class="dot unseen"></span>built, not read <span class="dot marked"></span>marked · “…” can go deeper</span></p>
+    <ul class="map">${rootNode ? branch(rootNode) : ''}</ul>`, true);
 }
 
 async function openBooks(nodeId) {
