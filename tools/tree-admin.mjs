@@ -36,6 +36,31 @@ if (cmd === 'status') {
   }
 }
 
+if (cmd === 'show') {
+  // node tools/tree-admin.mjs show "part of the title" — first two levels of that item's tree
+  const q = (process.argv[3] || '').toLowerCase();
+  const it = items.find((i) => q && i.title.toLowerCase().includes(q));
+  if (!it) { console.error('no matching item'); process.exit(1); }
+  const mine = nodes.filter((n) => n.item_id === it.id);
+  const kids = (id) => mine.filter((n) => n.parent_id === id);
+  const root = mine.find((n) => !n.parent_id);
+  console.log(it.title);
+  if (root) for (const a of kids(root.id)) { console.log(`  ${a.label}`); for (const b of kids(a.id)) console.log(`     - ${b.label}`); }
+  console.log(`(${mine.length} nodes)`);
+}
+
+if (cmd === 'rebuild') {
+  // node tools/tree-admin.mjs rebuild "part of the title" — deletes that item's tree; the generator rebuilds it.
+  const q = (process.argv[3] || '').toLowerCase();
+  const matches = items.filter((i) => q && i.title.toLowerCase().includes(q));
+  if (matches.length !== 1) { console.error(`need exactly one matching item, found ${matches.length}: ${matches.map((m) => m.title).join(' | ')}`); process.exit(1); }
+  const it = matches[0];
+  const n = nodes.filter((x) => x.item_id === it.id).length;
+  check(await sb.from('tree_requests').delete().eq('item_id', it.id));
+  check(await sb.from('tree_nodes').delete().eq('item_id', it.id).is('parent_id', null)); // children cascade
+  console.log(`deleted tree of "${it.title}" (${n} nodes); the generator will rebuild it`);
+}
+
 if (cmd === 'dedupe') {
   // Duplicates: siblings with the same label. Keep the oldest; delete the rest (children cascade).
   const cutoff = Date.now() - 2 * 60 * 1000; // leave anything being generated right now alone
